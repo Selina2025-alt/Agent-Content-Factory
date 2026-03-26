@@ -50,6 +50,22 @@ function Invoke-GitHubApi {
     }
 }
 
+function Get-RelativePath {
+    param(
+        [string]$Root,
+        [string]$Path
+    )
+
+    $rootWithSlash = $Root
+    if (-not $rootWithSlash.EndsWith([System.IO.Path]::DirectorySeparatorChar) -and -not $rootWithSlash.EndsWith([System.IO.Path]::AltDirectorySeparatorChar)) {
+        $rootWithSlash += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $rootUri = New-Object System.Uri($rootWithSlash)
+    $pathUri = New-Object System.Uri($Path)
+    return $rootUri.MakeRelativeUri($pathUri).ToString()
+}
+
 $repoRoot = (Resolve-Path ".").Path
 $repoApi = "https://api.github.com/repos/$Owner/$Repo"
 
@@ -60,7 +76,7 @@ $items = Get-ChildItem -Path $repoRoot -Recurse -File -Force | Where-Object {
 $tree = @()
 
 foreach ($item in $items) {
-    $relativePath = [System.IO.Path]::GetRelativePath($repoRoot, $item.FullName).Replace('\', '/')
+    $relativePath = (Get-RelativePath -Root $repoRoot -Path $item.FullName).Replace('\', '/')
     $bytes = [System.IO.File]::ReadAllBytes($item.FullName)
     $blob = Invoke-GitHubApi -Method POST -Uri "$repoApi/git/blobs" -Body @{
         content  = [System.Convert]::ToBase64String($bytes)
