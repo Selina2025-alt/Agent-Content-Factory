@@ -73,6 +73,26 @@ $items = Get-ChildItem -Path $repoRoot -Recurse -File -Force | Where-Object {
     $_.FullName -notmatch '[\\/]\.git([\\/]|$)'
 }
 
+$ref = Invoke-GitHubApi -Method GET -Uri "$repoApi/git/ref/heads/$Branch" -AllowNotFound
+
+if (-not $ref) {
+    if ($items.Count -eq 0) {
+        throw "Cannot initialize an empty remote repository from an empty working tree."
+    }
+
+    $bootstrapItem = $items | Select-Object -First 1
+    $bootstrapPath = (Get-RelativePath -Root $repoRoot -Path $bootstrapItem.FullName).Replace('\', '/')
+    $bootstrapBytes = [System.IO.File]::ReadAllBytes($bootstrapItem.FullName)
+
+    Invoke-GitHubApi -Method PUT -Uri "$repoApi/contents/$bootstrapPath" -Body @{
+        message = "Bootstrap repository"
+        content = [System.Convert]::ToBase64String($bootstrapBytes)
+        branch  = $Branch
+    } | Out-Null
+
+    $ref = Invoke-GitHubApi -Method GET -Uri "$repoApi/git/ref/heads/$Branch"
+}
+
 $tree = @()
 
 foreach ($item in $items) {
@@ -91,7 +111,6 @@ foreach ($item in $items) {
     }
 }
 
-$ref = Invoke-GitHubApi -Method GET -Uri "$repoApi/git/ref/heads/$Branch" -AllowNotFound
 $parentSha = $null
 $baseTreeSha = $null
 
