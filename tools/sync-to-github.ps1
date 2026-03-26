@@ -42,7 +42,7 @@ function Invoke-GitHubApi {
             $statusCode = [int]$_.Exception.Response.StatusCode
         }
 
-        if ($AllowNotFound -and $statusCode -eq 404) {
+        if ($AllowNotFound -and ($statusCode -eq 404 -or $statusCode -eq 409)) {
             return $null
         }
 
