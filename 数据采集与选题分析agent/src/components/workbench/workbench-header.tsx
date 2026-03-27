@@ -8,9 +8,9 @@ interface WorkbenchHeaderProps {
 }
 
 const tabs: Array<{ id: TabId; label: string }> = [
+  { id: "content", label: "内容" },
   { id: "report", label: "选题分析与报告" },
-  { id: "content", label: "监控策略" },
-  { id: "settings", label: "工作台日志" }
+  { id: "settings", label: "监控设置" }
 ];
 
 export function WorkbenchHeader({

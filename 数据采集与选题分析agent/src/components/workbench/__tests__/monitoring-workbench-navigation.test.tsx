@@ -2,8 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import MonitoringWorkbench from "@/components/workbench/monitoring-workbench";
+import MonitoringWorkbench, {
+  buildWorkbenchStateForCategory
+} from "@/components/workbench/monitoring-workbench";
 import { monitorCategories } from "@/lib/mock-data";
+import { buildInitialWorkbenchState } from "@/lib/workbench-selectors";
 
 describe("MonitoringWorkbench navigation", () => {
   it("keeps the default workbench contract and updates scoped content", async () => {
@@ -31,6 +34,8 @@ describe("MonitoringWorkbench navigation", () => {
         selected: true
       })
     ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "内容" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "监控设置" })).toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", { name: vibecodingCategory.name })
@@ -59,11 +64,41 @@ describe("MonitoringWorkbench navigation", () => {
     expect(
       within(rightRail).getByText(vibecodingCategory.decisionSignals.anomalySignals[0])
     ).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole("tab", { name: "监控策略" }));
+  it("resets category-scoped state when a category changes", () => {
+    const vibecodingCategory = monitorCategories[1];
+    const initialCategoryState = buildInitialWorkbenchState([vibecodingCategory]);
+    const staleState = {
+      ...initialCategoryState,
+      selectedCategoryId: monitorCategories[0].id,
+      reportView: "summary" as const,
+      selectedReportDate: "2026-01-01",
+      selectedContentDate: "2026-01-01",
+      selectedPlatformId: "bilibili" as const,
+      focusedTopicId: "stale-topic",
+      highlightedContentIds: ["stale-1", "stale-2"]
+    };
 
-    expect(
-      screen.getByRole("tab", { name: "监控策略", selected: true })
-    ).toBeInTheDocument();
+    const nextState = buildWorkbenchStateForCategory(
+      monitorCategories,
+      vibecodingCategory.id,
+      staleState.activeTab
+    );
+
+    expect(nextState.selectedCategoryId).toBe(vibecodingCategory.id);
+    expect(nextState.activeTab).toBe(staleState.activeTab);
+    expect(nextState.reportView).toBe(initialCategoryState.reportView);
+    expect(nextState.selectedReportDate).toBe(
+      initialCategoryState.selectedReportDate
+    );
+    expect(nextState.selectedContentDate).toBe(
+      initialCategoryState.selectedContentDate
+    );
+    expect(nextState.selectedPlatformId).toBe(
+      initialCategoryState.selectedPlatformId
+    );
+    expect(nextState.focusedTopicId).toBe(initialCategoryState.focusedTopicId);
+    expect(nextState.highlightedContentIds).toEqual([]);
   });
 });

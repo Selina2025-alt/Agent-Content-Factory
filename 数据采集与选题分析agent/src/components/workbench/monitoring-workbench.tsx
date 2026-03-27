@@ -8,7 +8,22 @@ import { RightRail } from "@/components/workbench/right-rail";
 import { WorkbenchHeader } from "@/components/workbench/workbench-header";
 import { monitorCategories } from "@/lib/mock-data";
 import { buildInitialWorkbenchState, getActiveCategory } from "@/lib/workbench-selectors";
-import type { WorkbenchState } from "@/lib/types";
+import type { TabId, WorkbenchState } from "@/lib/types";
+
+export function buildWorkbenchStateForCategory(
+  categories: typeof monitorCategories,
+  categoryId: string,
+  activeTab: TabId
+): WorkbenchState {
+  const activeCategory = getActiveCategory(categories, categoryId);
+  const categoryState = buildInitialWorkbenchState([activeCategory]);
+
+  return {
+    ...categoryState,
+    selectedCategoryId: activeCategory.id,
+    activeTab
+  };
+}
 
 export function MonitoringWorkbench() {
   const [workbenchState, setWorkbenchState] = useState<WorkbenchState>(() =>
@@ -43,10 +58,13 @@ export function MonitoringWorkbench() {
           categories={monitorCategories}
           selectedCategoryId={workbenchState.selectedCategoryId}
           onSelectCategory={(categoryId) =>
-            setWorkbenchState((current) => ({
-              ...current,
-              selectedCategoryId: categoryId
-            }))
+            setWorkbenchState((current) =>
+              buildWorkbenchStateForCategory(
+                monitorCategories,
+                categoryId,
+                current.activeTab
+              )
+            )
           }
         />
 
