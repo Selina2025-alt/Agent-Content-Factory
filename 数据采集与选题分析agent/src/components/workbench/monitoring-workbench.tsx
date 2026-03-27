@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ActionDeck } from "@/components/workbench/action-deck";
 import { CategorySidebar } from "@/components/workbench/category-sidebar";
+import { ContentTab } from "@/components/workbench/content-tab";
 import { ReportTab } from "@/components/workbench/report-tab";
 import { RightRail } from "@/components/workbench/right-rail";
 import { WorkbenchHeader } from "@/components/workbench/workbench-header";
@@ -14,7 +15,13 @@ import {
   getCurrentDailyReport,
   getLinkedContentIds
 } from "@/lib/workbench-selectors";
-import type { DailyReport, TabId, TopicIdea, WorkbenchState } from "@/lib/types";
+import type {
+  ContentItem,
+  DailyReport,
+  TabId,
+  TopicIdea,
+  WorkbenchState
+} from "@/lib/types";
 
 export function buildWorkbenchStateForCategory(
   categories: typeof monitorCategories,
@@ -29,54 +36,6 @@ export function buildWorkbenchStateForCategory(
     selectedCategoryId: activeCategory.id,
     activeTab
   };
-}
-
-function FocusedContentBridge({
-  activeCategory,
-  highlightedContentIds
-}: {
-  activeCategory: (typeof monitorCategories)[number];
-  highlightedContentIds: string[];
-}) {
-  const focusedContent = activeCategory.content.filter((content) =>
-    highlightedContentIds.includes(content.id)
-  );
-
-  if (highlightedContentIds.length === 0) {
-    return (
-      <section
-        className="workbench-shell__hero-card"
-        aria-label={`${activeCategory.name} 支撑内容`}
-      >
-        <div className="workbench-shell__panel-kicker">内容</div>
-        <h2>{`${activeCategory.name} 支撑内容聚焦`}</h2>
-        <p>请先从选题报告中点击 查看支撑内容。</p>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      className="workbench-shell__hero-card"
-      aria-label={`${activeCategory.name} 支撑内容`}
-    >
-      <div className="workbench-shell__panel-kicker">内容</div>
-      <h2>{`${activeCategory.name} 支撑内容聚焦`}</h2>
-      <p>{`已聚焦 ${highlightedContentIds.length} 条支撑内容。`}</p>
-      <div className="workbench-shell__action-deck">
-        {focusedContent.map((content) => (
-          <article key={content.id} className="workbench-shell__workspace-card">
-            <span>
-              {content.publishedAt} · {content.platformId}
-            </span>
-            <strong>{content.title}</strong>
-            <p>{content.aiSummary}</p>
-            <small>{content.author}</small>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function SettingsBridge({
@@ -104,7 +63,7 @@ export function MonitoringWorkbench() {
         <div className="workbench-shell__grid">
           <main className="workbench-shell__panel workbench-shell__panel--main">
             <div className="workbench-shell__hero-card">
-              <div className="workbench-shell__panel-kicker">今日建议动作区</div>
+              <div className="workbench-shell__panel-kicker">今日建议动作池</div>
               <h2>暂无监控分类</h2>
               <p>请先添加一个监控分类后再查看工作台。</p>
             </div>
@@ -133,6 +92,37 @@ export function MonitoringWorkbench() {
       selectedContentDate: report.date,
       focusedTopicId: topic.id,
       highlightedContentIds: linkedContentIds
+    }));
+  }
+
+  function handleOpenLinkedInsight(content: ContentItem) {
+    const linkedTopicId = content.linkedTopicIds.find((topicId) =>
+      activeCategory.reports.some((report) =>
+        report.topics.some((topic) => topic.id === topicId)
+      )
+    );
+
+    const linkedTopic = linkedTopicId
+      ? activeCategory.reports
+          .flatMap((report) => report.topics)
+          .find((topic) => topic.id === linkedTopicId)
+      : null;
+
+    const linkedReport = linkedTopic
+      ? activeCategory.reports.find((report) =>
+          report.topics.some((topic) => topic.id === linkedTopic.id)
+        )
+      : null;
+
+    setWorkbenchState((current) => ({
+      ...current,
+      activeTab: "report",
+      selectedReportDate: linkedReport?.date ?? current.selectedReportDate,
+      selectedContentDate: content.date,
+      focusedTopicId: linkedTopic?.id ?? current.focusedTopicId,
+      highlightedContentIds: linkedTopic
+        ? getLinkedContentIds(linkedTopic)
+        : current.highlightedContentIds
     }));
   }
 
@@ -191,9 +181,24 @@ export function MonitoringWorkbench() {
               <ActionDeck activeCategory={activeCategory} />
             </>
           ) : workbenchState.activeTab === "content" ? (
-            <FocusedContentBridge
+            <ContentTab
               activeCategory={activeCategory}
+              selectedContentDate={workbenchState.selectedContentDate}
+              selectedPlatformId={workbenchState.selectedPlatformId}
               highlightedContentIds={workbenchState.highlightedContentIds}
+              onSelectContentDate={(selectedContentDate) =>
+                setWorkbenchState((current) => ({
+                  ...current,
+                  selectedContentDate
+                }))
+              }
+              onSelectPlatformId={(selectedPlatformId) =>
+                setWorkbenchState((current) => ({
+                  ...current,
+                  selectedPlatformId
+                }))
+              }
+              onOpenLinkedInsight={handleOpenLinkedInsight}
             />
           ) : (
             <SettingsBridge activeCategory={activeCategory} />
