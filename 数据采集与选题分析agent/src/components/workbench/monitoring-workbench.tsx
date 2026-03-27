@@ -25,8 +25,6 @@ export function MonitoringWorkbench() {
 
   return (
     <section className="workbench-shell">
-      <WorkbenchHeader activeCategory={activeCategory} />
-
       <div className="workbench-shell__grid">
         <CategorySidebar
           categories={monitorCategories}
@@ -36,6 +34,7 @@ export function MonitoringWorkbench() {
         />
 
         <main className="workbench-shell__panel workbench-shell__panel--main">
+          <WorkbenchHeader activeCategory={activeCategory} />
           <ActionDeck activeCategory={activeCategory} />
         </main>
 

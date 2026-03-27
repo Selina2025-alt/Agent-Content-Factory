@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -16,14 +16,22 @@ describe("MonitoringWorkbench navigation", () => {
       screen.getByRole("button", { name: vibecodingCategory.name })
     );
 
+    const main = screen.getByRole("main");
+
     expect(
-      screen.getByRole("heading", { name: vibecodingCategory.name })
+      within(main).getByRole("heading", { name: vibecodingCategory.name })
     ).toBeInTheDocument();
     expect(
-      screen.getByText("今日最值得跟进的 3 个选题")
+      within(main).getByRole("heading", {
+        name: "今日最值得跟进的 3 个选题"
+      })
     ).toBeInTheDocument();
-    expect(screen.getByText(vibecodingCategory.actionItems[0].title)).toBeInTheDocument();
-    expect(screen.getByText("平台异常波动提示")).toBeInTheDocument();
+    expect(
+      within(main).getByText(vibecodingCategory.actionItems[0].title)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("平台异常波动提示")
+    ).toBeInTheDocument();
     expect(
       screen.getByText(vibecodingCategory.decisionSignals.priorityDistribution[0])
     ).toBeInTheDocument();
