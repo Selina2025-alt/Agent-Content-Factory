@@ -46,5 +46,49 @@ describe("content insight bridge", () => {
     expect(
       screen.getByRole("button", { name: `查看支撑内容：${topic.title}` })
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "内容" }));
+
+    expect(
+      screen.queryByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "全部" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  it("exits focused evidence mode when manual browsing changes the content date", async () => {
+    const user = userEvent.setup();
+    const category = monitorCategories[0];
+    const initialState = buildInitialWorkbenchState([category]);
+    const report = getCurrentDailyReport(category, initialState.selectedReportDate);
+    const topic = report.topics[0];
+    const linkedContentIds = getLinkedContentIds(topic);
+    const alternateDate = category.content.find((content) => content.date !== report.date)?.date;
+
+    expect(alternateDate).toBeDefined();
+
+    render(<MonitoringWorkbench />);
+
+    await user.click(
+      screen.getByRole("button", { name: `查看支撑内容：${topic.title}` })
+    );
+
+    expect(
+      screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: new RegExp(alternateDate!) }));
+
+    expect(
+      screen.queryByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
+    ).toBeInTheDocument();
   });
 });

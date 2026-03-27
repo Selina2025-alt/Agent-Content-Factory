@@ -18,19 +18,34 @@ describe("report evidence bridge", () => {
     const report = getCurrentDailyReport(category, initialState.selectedReportDate);
     const topic = report.topics[0];
     const linkedContentIds = getLinkedContentIds(topic);
+    const linkedPlatformIds = new Set(
+      category.content
+        .filter((content) => linkedContentIds.includes(content.id))
+        .map((content) => content.platformId)
+    );
+    const stalePlatform = category.settings.platforms.find(
+      (platform) => !linkedPlatformIds.has(platform.id)
+    );
     const linkedContent = category.content.find(
       (content) => content.id === linkedContentIds[0]
     );
 
     expect(linkedContent).toBeDefined();
+    expect(stalePlatform).toBeDefined();
 
     render(<MonitoringWorkbench />);
 
     await user.click(screen.getByRole("tab", { name: "内容" }));
 
     expect(
-      screen.getByText(/请先从选题报告中点击 查看支撑内容/)
+      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
     ).toBeInTheDocument();
+    const platformFilterGroup = screen.getByRole("group", { name: "平台筛选" });
+    expect(platformFilterGroup).toBeInTheDocument();
+
+    await user.click(
+      within(platformFilterGroup).getByRole("button", { name: stalePlatform!.label })
+    );
 
     await user.click(screen.getByRole("tab", { name: "选题分析与报告" }));
 
@@ -47,6 +62,11 @@ describe("report evidence bridge", () => {
     await user.click(supportButton);
 
     expect(screen.getByRole("tab", { name: "内容", selected: true })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "平台筛选" })).getByRole("button", {
+        name: "全部"
+      })
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
     ).toBeInTheDocument();

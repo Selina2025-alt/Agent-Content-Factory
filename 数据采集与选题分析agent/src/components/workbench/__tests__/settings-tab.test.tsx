@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import MonitoringWorkbench from "@/components/workbench/monitoring-workbench";
 import { SettingsTab } from "@/components/workbench/settings-tab";
 import { monitorCategories } from "@/lib/mock-data";
 
@@ -34,5 +35,21 @@ describe("SettingsTab", () => {
 
     expect(onAddKeyword).toHaveBeenCalledTimes(1);
     expect(onAddAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("wires add-entry actions in the rendered workbench", async () => {
+    const user = userEvent.setup();
+
+    render(<MonitoringWorkbench />);
+
+    await user.click(screen.getByRole("tab", { name: "监控设置" }));
+    await user.click(screen.getByRole("button", { name: "添加关键词" }));
+
+    expect(screen.getByText("关键词监控草稿")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收起草稿" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "添加账号" }));
+
+    expect(screen.getByText("对标账号监控草稿")).toBeInTheDocument();
   });
 });

@@ -11,8 +11,10 @@ import type {
 
 interface SettingsTabProps {
   activeCategory: MonitorCategory;
+  draftTarget?: "keyword" | "account" | null;
   onAddKeyword?: () => void;
   onAddAccount?: () => void;
+  onClearDraft?: () => void;
 }
 
 function getPlatformFeedback(platform: PlatformSetting) {
@@ -90,8 +92,10 @@ function Card({
 
 export function SettingsTab({
   activeCategory,
+  draftTarget,
   onAddKeyword,
-  onAddAccount
+  onAddAccount,
+  onClearDraft
 }: SettingsTabProps) {
   return (
     <section
@@ -103,6 +107,25 @@ export function SettingsTab({
       <p>
         {`当前配置覆盖 ${activeCategory.overview.platformCount} 个平台、${activeCategory.overview.keywordCount} 个关键词、${activeCategory.overview.creatorCount} 个账号，看的质量回报，不是编辑表单。`}
       </p>
+
+      {draftTarget ? (
+        <article className="workbench-shell__settings-draft" aria-live="polite">
+          <span className="workbench-shell__settings-card-eyebrow">新增草稿</span>
+          <strong>{draftTarget === "keyword" ? "关键词监控草稿" : "对标账号监控草稿"}</strong>
+          <p>
+            {draftTarget === "keyword"
+              ? "下一步建议先补齐平台范围、命中预期和排重规则，再决定是否需要扩充关键词簇。"
+              : "下一步建议先补齐平台、账号定位和近 7 天活跃度，再决定是否纳入长期监控。"}
+          </p>
+          <div className="workbench-shell__settings-card-actions">
+            {onClearDraft ? (
+              <button type="button" className="workbench-shell__tab" onClick={onClearDraft}>
+                收起草稿
+              </button>
+            ) : null}
+          </div>
+        </article>
+      ) : null}
 
       <div className="workbench-shell__settings-grid">
         <section className="workbench-shell__settings-section" aria-label="platform-settings">

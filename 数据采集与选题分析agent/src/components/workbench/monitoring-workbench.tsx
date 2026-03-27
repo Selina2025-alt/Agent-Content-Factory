@@ -43,6 +43,9 @@ export function MonitoringWorkbench() {
   const [workbenchState, setWorkbenchState] = useState<WorkbenchState>(() =>
     buildInitialWorkbenchState(monitorCategories)
   );
+  const [settingsDraftTarget, setSettingsDraftTarget] = useState<
+    "keyword" | "account" | null
+  >(null);
 
   if (monitorCategories.length === 0) {
     return (
@@ -77,6 +80,7 @@ export function MonitoringWorkbench() {
       activeTab: "content",
       selectedReportDate: report.date,
       selectedContentDate: report.date,
+      selectedPlatformId: "all",
       focusedTopicId: topic.id,
       highlightedContentIds: linkedContentIds
     }));
@@ -106,10 +110,9 @@ export function MonitoringWorkbench() {
       activeTab: "report",
       selectedReportDate: linkedReport?.date ?? current.selectedReportDate,
       selectedContentDate: content.date,
-      focusedTopicId: linkedTopic?.id ?? current.focusedTopicId,
-      highlightedContentIds: linkedTopic
-        ? getLinkedContentIds(linkedTopic)
-        : current.highlightedContentIds
+      selectedPlatformId: "all",
+      focusedTopicId: null,
+      highlightedContentIds: []
     }));
   }
 
@@ -119,15 +122,17 @@ export function MonitoringWorkbench() {
         <CategorySidebar
           categories={monitorCategories}
           selectedCategoryId={workbenchState.selectedCategoryId}
-          onSelectCategory={(categoryId) =>
+          onSelectCategory={(categoryId) => {
+            setSettingsDraftTarget(null);
+
             setWorkbenchState((current) =>
               buildWorkbenchStateForCategory(
                 monitorCategories,
                 categoryId,
                 current.activeTab
               )
-            )
-          }
+            );
+          }}
         />
 
         <main className="workbench-shell__panel workbench-shell__panel--main">
@@ -176,19 +181,29 @@ export function MonitoringWorkbench() {
               onSelectContentDate={(selectedContentDate) =>
                 setWorkbenchState((current) => ({
                   ...current,
-                  selectedContentDate
+                  selectedContentDate,
+                  focusedTopicId: null,
+                  highlightedContentIds: []
                 }))
               }
               onSelectPlatformId={(selectedPlatformId) =>
                 setWorkbenchState((current) => ({
                   ...current,
-                  selectedPlatformId
+                  selectedPlatformId,
+                  focusedTopicId: null,
+                  highlightedContentIds: []
                 }))
               }
               onOpenLinkedInsight={handleOpenLinkedInsight}
             />
           ) : (
-            <SettingsTab activeCategory={activeCategory} />
+            <SettingsTab
+              activeCategory={activeCategory}
+              draftTarget={settingsDraftTarget}
+              onAddKeyword={() => setSettingsDraftTarget("keyword")}
+              onAddAccount={() => setSettingsDraftTarget("account")}
+              onClearDraft={() => setSettingsDraftTarget(null)}
+            />
           )}
         </main>
 

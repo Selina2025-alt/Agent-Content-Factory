@@ -196,6 +196,23 @@ select {
   gap: 22px;
 }
 
+.workbench-shell__settings-draft {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid rgba(124, 79, 40, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 249, 242, 0.92);
+}
+
+.workbench-shell__settings-draft strong {
+  font-size: 1.05rem;
+}
+
+.workbench-shell__settings-draft p {
+  max-width: 64ch;
+}
+
 .workbench-shell__settings-section {
   display: grid;
   gap: 14px;
@@ -203,7 +220,7 @@ select {
 
 .workbench-shell__settings-section-header {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
