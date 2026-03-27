@@ -7,6 +7,7 @@ import { CategorySidebar } from "@/components/workbench/category-sidebar";
 import { ContentTab } from "@/components/workbench/content-tab";
 import { ReportTab } from "@/components/workbench/report-tab";
 import { RightRail } from "@/components/workbench/right-rail";
+import { SettingsTab } from "@/components/workbench/settings-tab";
 import { WorkbenchHeader } from "@/components/workbench/workbench-header";
 import { monitorCategories } from "@/lib/mock-data";
 import {
@@ -38,20 +39,6 @@ export function buildWorkbenchStateForCategory(
   };
 }
 
-function SettingsBridge({
-  activeCategory
-}: {
-  activeCategory: (typeof monitorCategories)[number];
-}) {
-  return (
-    <section className="workbench-shell__hero-card" aria-label="监控设置">
-      <div className="workbench-shell__panel-kicker">监控设置</div>
-      <h2>{`${activeCategory.name} 监控设置`}</h2>
-      <p>{activeCategory.settings.schedule.analysisScope}</p>
-    </section>
-  );
-}
-
 export function MonitoringWorkbench() {
   const [workbenchState, setWorkbenchState] = useState<WorkbenchState>(() =>
     buildInitialWorkbenchState(monitorCategories)
@@ -63,9 +50,9 @@ export function MonitoringWorkbench() {
         <div className="workbench-shell__grid">
           <main className="workbench-shell__panel workbench-shell__panel--main">
             <div className="workbench-shell__hero-card">
-              <div className="workbench-shell__panel-kicker">今日建议动作池</div>
-              <h2>暂无监控分类</h2>
-              <p>请先添加一个监控分类后再查看工作台。</p>
+              <div className="workbench-shell__panel-kicker">浠婃棩寤鸿鍔ㄤ綔姹?</div>
+              <h2>鏆傛棤鐩戞帶鍒嗙被</h2>
+              <p>璇峰厛娣诲姞涓€涓洃鎺у垎绫诲悗鍐嶆煡鐪嬪伐浣滃彴銆?</p>
             </div>
           </main>
         </div>
@@ -201,7 +188,7 @@ export function MonitoringWorkbench() {
               onOpenLinkedInsight={handleOpenLinkedInsight}
             />
           ) : (
-            <SettingsBridge activeCategory={activeCategory} />
+            <SettingsTab activeCategory={activeCategory} />
           )}
         </main>
 
