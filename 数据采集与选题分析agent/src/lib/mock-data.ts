@@ -376,6 +376,24 @@ const claudecodeContent = [
     true
   ),
   makeContent(
+    "cc-xhs-0325-1",
+    "2026-03-25",
+    "上午",
+    "Claude Code 提示词模板库：团队协作也能直接复用",
+    "xiaohongshu",
+    "阿梨编辑室",
+    "2026-03-25 09:05",
+    76,
+    "1.9k",
+    "96",
+    "511",
+    ["团队协作", "模板库", "Claude Code"],
+    "模板导向很强，评论区对完整版本和场景细分的需求明显。",
+    ["cc-topic-0325-prompt-library"],
+    true,
+    true
+  ),
+  makeContent(
     "cc-dy-0326-1",
     "2026-03-26",
     "晚上",
@@ -428,6 +446,24 @@ const claudecodeContent = [
     ["cc-topic-0326-toolchain"],
     false,
     true
+  ),
+  makeContent(
+    "cc-weibo-0326-1",
+    "2026-03-26",
+    "晚上",
+    "Claude Code 配合 MCP 的效率提升到底有多明显",
+    "weibo",
+    "效率观察员",
+    "2026-03-26 20:05",
+    73,
+    "1.1k",
+    "64",
+    "214",
+    ["MCP", "效率提升", "工具链"],
+    "微博更像是讨论入口，用户在追问完整配置和真实使用成本。",
+    ["cc-topic-0326-toolchain"],
+    true,
+    false
   ),
   makeContent(
     "cc-weibo-0325-1",

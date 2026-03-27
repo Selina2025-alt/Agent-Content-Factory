@@ -91,4 +91,29 @@ describe("workbench selectors", () => {
     expect(category.settings.creators[0].platformId).toBe("xiaohongshu");
     expect(category.settings.creators[0].weeklyUpdateCount).toBe(4);
   });
+
+  it("keeps evidence content ids and linked topic ids consistent across the mock graph", () => {
+    for (const category of monitorCategories) {
+      const topicIds = new Set(
+        category.reports.flatMap((report) => report.topics.map((topic) => topic.id))
+      );
+      const contentIds = new Set(category.content.map((content) => content.id));
+
+      for (const report of category.reports) {
+        for (const topic of report.topics) {
+          for (const evidence of topic.evidence) {
+            for (const contentId of evidence.contentIds) {
+              expect(contentIds.has(contentId)).toBe(true);
+            }
+          }
+        }
+      }
+
+      for (const content of category.content) {
+        for (const linkedTopicId of content.linkedTopicIds) {
+          expect(topicIds.has(linkedTopicId)).toBe(true);
+        }
+      }
+    }
+  });
 });
