@@ -6,37 +6,64 @@ import MonitoringWorkbench from "@/components/workbench/monitoring-workbench";
 import { monitorCategories } from "@/lib/mock-data";
 
 describe("MonitoringWorkbench navigation", () => {
-  it("switches categories and updates the workbench context", async () => {
+  it("keeps the default workbench contract and updates scoped content", async () => {
     const user = userEvent.setup();
+    const firstCategory = monitorCategories[0];
     const vibecodingCategory = monitorCategories[1];
 
     render(<MonitoringWorkbench />);
+
+    const main = screen.getByRole("main");
+    const rightRail = screen.getByRole("complementary", { name: "右侧面板" });
+
+    expect(
+      within(main).getByRole("heading", { name: firstCategory.name })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: firstCategory.name,
+        pressed: true
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", {
+        name: "选题分析与报告",
+        selected: true
+      })
+    ).toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", { name: vibecodingCategory.name })
     );
 
-    const main = screen.getByRole("main");
-
     expect(
       within(main).getByRole("heading", { name: vibecodingCategory.name })
     ).toBeInTheDocument();
     expect(
+      screen.getByRole("button", {
+        name: vibecodingCategory.name,
+        pressed: true
+      })
+    ).toBeInTheDocument();
+    expect(
       within(main).getByRole("heading", {
-        name: "今日最值得跟进的 3 个选题"
+        name: `今日最值得跟进的 ${vibecodingCategory.actionItems.length} 个选题`
       })
     ).toBeInTheDocument();
     expect(
       within(main).getByText(vibecodingCategory.actionItems[0].title)
     ).toBeInTheDocument();
     expect(
-      screen.getByText("平台异常波动提示")
+      within(rightRail).getByText(vibecodingCategory.decisionSignals.priorityDistribution[0])
     ).toBeInTheDocument();
     expect(
-      screen.getByText(vibecodingCategory.decisionSignals.priorityDistribution[0])
+      within(rightRail).getByText(vibecodingCategory.decisionSignals.anomalySignals[0])
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "监控策略" }));
+
     expect(
-      screen.getByText(vibecodingCategory.decisionSignals.anomalySignals[0])
+      screen.getByRole("tab", { name: "监控策略", selected: true })
     ).toBeInTheDocument();
   });
 });

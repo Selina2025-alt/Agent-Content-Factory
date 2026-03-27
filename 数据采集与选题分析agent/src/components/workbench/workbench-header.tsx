@@ -1,12 +1,23 @@
 import type { MonitorCategory } from "@/lib/types";
+import type { TabId } from "@/lib/types";
 
 interface WorkbenchHeaderProps {
   activeCategory: MonitorCategory;
+  activeTab: TabId;
+  onTabChange: (tabId: TabId) => void;
 }
 
-const tabs = ["选题分析与报告", "监控策略", "工作台日志"];
+const tabs: Array<{ id: TabId; label: string }> = [
+  { id: "report", label: "选题分析与报告" },
+  { id: "content", label: "监控策略" },
+  { id: "settings", label: "工作台日志" }
+];
 
-export function WorkbenchHeader({ activeCategory }: WorkbenchHeaderProps) {
+export function WorkbenchHeader({
+  activeCategory,
+  activeTab,
+  onTabChange
+}: WorkbenchHeaderProps) {
   return (
     <header className="workbench-shell__header">
       <div className="workbench-shell__eyebrow">内容监控工作台</div>
@@ -21,19 +32,20 @@ export function WorkbenchHeader({ activeCategory }: WorkbenchHeaderProps) {
       </div>
 
       <nav className="workbench-shell__tabs" role="tablist" aria-label="工作台视图">
-        {tabs.map((tab, index) => (
+        {tabs.map((tab) => (
           <button
-            key={tab}
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={index === 0}
+            aria-selected={tab.id === activeTab}
             className={
-              index === 0
+              tab.id === activeTab
                 ? "workbench-shell__tab is-active"
                 : "workbench-shell__tab"
             }
+            onClick={() => onTabChange(tab.id)}
           >
-            {tab}
+            {tab.label}
           </button>
         ))}
       </nav>

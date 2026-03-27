@@ -5,10 +5,15 @@ interface ActionDeckProps {
 }
 
 export function ActionDeck({ activeCategory }: ActionDeckProps) {
+  const actionCount = activeCategory.actionItems.length;
+
   return (
-    <section className="workbench-shell__hero-card" aria-label="今日最值得跟进的 3 个选题">
+    <section
+      className="workbench-shell__hero-card"
+      aria-label={`今日最值得跟进的 ${actionCount} 个选题`}
+    >
       <div className="workbench-shell__panel-kicker">今日建议动作区</div>
-      <h2>今日最值得跟进的 3 个选题</h2>
+      <h2>{`今日最值得跟进的 ${actionCount} 个选题`}</h2>
       <p>{activeCategory.description}</p>
 
       <div className="workbench-shell__action-deck">

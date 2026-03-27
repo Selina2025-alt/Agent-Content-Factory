@@ -2,17 +2,23 @@ import type { MonitorCategory } from "@/lib/types";
 
 interface CategorySidebarProps {
   categories: MonitorCategory[];
-  activeCategory: MonitorCategory;
   selectedCategoryId: string;
   onSelectCategory: (categoryId: string) => void;
 }
 
 export function CategorySidebar({
   categories,
-  activeCategory,
   selectedCategoryId,
   onSelectCategory
 }: CategorySidebarProps) {
+  const activeCategory =
+    categories.find((category) => category.id === selectedCategoryId) ??
+    categories[0];
+
+  if (!activeCategory) {
+    return null;
+  }
+
   return (
     <aside
       className="workbench-shell__panel workbench-shell__panel--left"
