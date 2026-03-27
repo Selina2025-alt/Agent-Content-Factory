@@ -1,6 +1,7 @@
 export type TabId = "report" | "content" | "settings";
 export type ReportView = "daily" | "summary";
 export type PlatformId = "all" | "douyin" | "xiaohongshu" | "weibo" | "bilibili";
+export type NonAggregatePlatformId = Exclude<PlatformId, "all">;
 export type TimeOfDay = "上午" | "下午" | "晚上";
 
 export interface ActionItem {
@@ -16,7 +17,7 @@ export interface ActionItem {
 export interface InsightEvidence {
   id: string;
   contentIds: string[];
-  sourcePlatformIds: PlatformId[];
+  sourcePlatformIds: NonAggregatePlatformId[];
   summary: string;
 }
 
@@ -27,7 +28,7 @@ export interface TopicIdea {
   whyNow: string;
   hook: string;
   growthSpace: string;
-  sourcePlatforms: PlatformId[];
+  sourcePlatforms: NonAggregatePlatformId[];
   evidenceCount: number;
   coreSamples: string[];
   burstWindow: string;
@@ -52,7 +53,7 @@ export interface ContentItem {
   date: string;
   timeOfDay: TimeOfDay;
   title: string;
-  platformId: Exclude<PlatformId, "all">;
+  platformId: NonAggregatePlatformId;
   author: string;
   publishedAt: string;
   heatScore: number;
@@ -69,23 +70,23 @@ export interface ContentItem {
 }
 
 export interface PlatformSetting {
-  id: Exclude<PlatformId, "all">;
+  id: NonAggregatePlatformId;
   label: string;
   enabled: boolean;
   syncedAt: string;
   keywordCount: number;
   creatorCount: number;
-  successRate: string;
-  qualityRate: string;
+  successRate: number;
+  qualityRate: number;
   recommendation: string;
 }
 
 export interface KeywordTarget {
   id: string;
   label: string;
-  platformLabels: string;
+  platformIds: NonAggregatePlatformId[];
   hitCount: number;
-  qualityRate: string;
+  qualityRate: number;
   qualityHint: string;
   overlapHint: string;
 }
@@ -93,11 +94,11 @@ export interface KeywordTarget {
 export interface CreatorTarget {
   id: string;
   name: string;
-  platformLabel: string;
+  platformId: NonAggregatePlatformId;
   profile: string;
   updatedAt: string;
   hotContentStatus: string;
-  weeklyActivity: string;
+  weeklyUpdateCount: number;
   hotSampleContribution: number;
   healthHint: string;
 }

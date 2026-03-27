@@ -1,11 +1,29 @@
-import { MonitorCategory, TopicIdea, WorkbenchState } from "@/lib/types";
+import { DailyReport, MonitorCategory, TopicIdea, WorkbenchState } from "@/lib/types";
 
-function getLatestReportDate(category: MonitorCategory) {
-  return category.reports[0]?.date ?? "";
+function getDefaultCategory(categories: MonitorCategory[]) {
+  return categories[0];
+}
+
+function getLatestReport(reports: DailyReport[]) {
+  return reports.reduce<DailyReport | undefined>((latest, report) => {
+    if (!latest) {
+      return report;
+    }
+
+    return report.date > latest.date ? report : latest;
+  }, undefined);
+}
+
+function resolveCategory(categories: MonitorCategory[], categoryId: string) {
+  return categories.find((category) => category.id === categoryId) ?? getDefaultCategory(categories);
+}
+
+function resolveReport(category: MonitorCategory, date: string) {
+  return category.reports.find((report) => report.date === date) ?? getLatestReport(category.reports);
 }
 
 export function buildInitialWorkbenchState(categories: MonitorCategory[]): WorkbenchState {
-  const firstCategory = categories[0];
+  const firstCategory = getDefaultCategory(categories);
 
   if (!firstCategory) {
     return {
@@ -20,29 +38,39 @@ export function buildInitialWorkbenchState(categories: MonitorCategory[]): Workb
     };
   }
 
-  const latestReportDate = getLatestReportDate(firstCategory);
-  const firstTopic = firstCategory.reports[0]?.topics[0] ?? null;
+  const latestReport = getLatestReport(firstCategory.reports);
+  const focusedTopicId = latestReport?.topics[0]?.id ?? null;
+  const selectedReportDate = latestReport?.date ?? "";
 
   return {
     selectedCategoryId: firstCategory.id,
     activeTab: "report",
     reportView: "daily",
-    selectedReportDate: latestReportDate,
-    selectedContentDate: latestReportDate,
+    selectedReportDate,
+    selectedContentDate: selectedReportDate,
     selectedPlatformId: "all",
-    focusedTopicId: firstTopic?.id ?? null,
+    focusedTopicId,
     highlightedContentIds: []
   };
 }
 
 export function getActiveCategory(categories: MonitorCategory[], categoryId: string) {
-  return categories.find((category) => category.id === categoryId) ?? categories[0]!;
+  return resolveCategory(categories, categoryId) ?? categories[0]!;
 }
 
 export function getCurrentDailyReport(category: MonitorCategory, date: string) {
-  return category.reports.find((report) => report.date === date) ?? category.reports[0]!;
+  return resolveReport(category, date) ?? category.reports[0]!;
 }
 
 export function getLinkedContentIds(topic: TopicIdea) {
-  return topic.evidence.flatMap((item) => item.contentIds);
+  const seen = new Set<string>();
+
+  return topic.evidence.flatMap((item) => item.contentIds).filter((contentId) => {
+    if (seen.has(contentId)) {
+      return false;
+    }
+
+    seen.add(contentId);
+    return true;
+  });
 }
