@@ -6,7 +6,6 @@
   --ink: #20160f;
   --muted: rgba(32, 22, 15, 0.68);
   --accent: #7c4f28;
-  --accent-soft: rgba(124, 79, 40, 0.12);
   --shadow: 0 18px 48px rgba(58, 37, 20, 0.12);
 }
 
@@ -44,9 +43,9 @@ select {
   gap: 20px;
 }
 
-.workbench-header,
-.workbench-tabs,
-.panel {
+.workbench-shell__header,
+.workbench-shell__tabs,
+.workbench-shell__panel {
   border: 1px solid var(--panel-border);
   border-radius: 24px;
   background: var(--panel-bg);
@@ -54,12 +53,12 @@ select {
   backdrop-filter: blur(10px);
 }
 
-.workbench-header {
+.workbench-shell__header {
   padding: 24px 28px;
 }
 
-.eyebrow,
-.panel-kicker {
+.workbench-shell__eyebrow,
+.workbench-shell__panel-kicker {
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -67,27 +66,27 @@ select {
   font-weight: 700;
 }
 
-.workbench-title {
+.workbench-shell__title {
   margin: 10px 0 8px;
   font-family: var(--font-serif), "Noto Serif SC", serif;
   font-size: clamp(2rem, 3vw, 3.25rem);
   line-height: 1.1;
 }
 
-.workbench-description {
+.workbench-shell__description {
   margin: 0;
   max-width: 56ch;
   color: var(--muted);
 }
 
-.workbench-tabs {
+.workbench-shell__tabs {
   display: flex;
   gap: 10px;
   padding: 10px;
   flex-wrap: wrap;
 }
 
-.workbench-tab {
+.workbench-shell__tab {
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 10px 16px;
@@ -95,38 +94,38 @@ select {
   color: var(--muted);
 }
 
-.workbench-tab.is-active {
+.workbench-shell__tab.is-active {
   background: var(--ink);
   color: #fff7ef;
   border-color: var(--ink);
 }
 
-.workbench-grid {
+.workbench-shell__grid {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
 }
 
-.panel {
+.workbench-shell__panel {
   padding: 22px;
   min-width: 0;
 }
 
-.panel-block + .panel-block {
+.workbench-shell__panel-block + .workbench-shell__panel-block {
   margin-top: 24px;
 }
 
-.category-chip,
-.workspace-card,
-.insight-card,
-.hero-card {
+.workbench-shell__category-chip,
+.workbench-shell__workspace-card,
+.workbench-shell__insight-card,
+.workbench-shell__hero-card {
   border: 1px solid rgba(124, 79, 40, 0.16);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.7);
 }
 
-.category-chip {
+.workbench-shell__category-chip {
   display: inline-flex;
   margin-top: 12px;
   padding: 8px 12px;
@@ -134,8 +133,8 @@ select {
   font-weight: 700;
 }
 
-.list-stack,
-.insight-stack {
+.workbench-shell__list-stack,
+.workbench-shell__insight-stack {
   display: grid;
   gap: 12px;
   margin: 16px 0 0;
@@ -143,32 +142,32 @@ select {
   list-style: none;
 }
 
-.list-stack li {
+.workbench-shell__list-stack li {
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(124, 79, 40, 0.06);
 }
 
-.workspace-card,
-.insight-card {
+.workbench-shell__workspace-card,
+.workbench-shell__insight-card {
   display: grid;
   gap: 4px;
   padding: 14px 16px;
 }
 
-.workspace-card span,
-.insight-card span {
+.workbench-shell__workspace-card span,
+.workbench-shell__insight-card span {
   color: var(--muted);
   font-size: 0.88rem;
 }
 
-.workspace-card strong,
-.insight-card strong,
-.hero-card h2 {
+.workbench-shell__workspace-card strong,
+.workbench-shell__insight-card strong,
+.workbench-shell__hero-card h2 {
   font-size: 1.05rem;
 }
 
-.hero-card {
+.workbench-shell__hero-card {
   min-height: 100%;
   padding: 28px;
   display: grid;
@@ -179,21 +178,21 @@ select {
     radial-gradient(circle at top right, rgba(124, 79, 40, 0.12), transparent 34%);
 }
 
-.hero-card h2 {
+.workbench-shell__hero-card h2 {
   margin: 0;
   font-family: var(--font-serif), "Noto Serif SC", serif;
   font-size: clamp(1.6rem, 2vw, 2.2rem);
   line-height: 1.25;
 }
 
-.hero-card p {
+.workbench-shell__hero-card p {
   margin: 0;
   color: var(--muted);
   max-width: 52ch;
 }
 
 @media (max-width: 1080px) {
-  .workbench-grid {
+  .workbench-shell__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -203,18 +202,18 @@ select {
     padding: 16px;
   }
 
-  .workbench-header,
-  .workbench-tabs,
-  .panel {
+  .workbench-shell__header,
+  .workbench-shell__tabs,
+  .workbench-shell__panel {
     border-radius: 20px;
   }
 
-  .workbench-header,
-  .panel {
+  .workbench-shell__header,
+  .workbench-shell__panel {
     padding: 18px;
   }
 
-  .workbench-tabs {
+  .workbench-shell__tabs {
     gap: 8px;
   }
 }
