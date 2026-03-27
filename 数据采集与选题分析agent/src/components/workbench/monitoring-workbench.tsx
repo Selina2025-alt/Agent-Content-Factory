@@ -33,16 +33,27 @@ export function buildWorkbenchStateForCategory(
 
 function FocusedContentBridge({
   activeCategory,
-  activeTopic,
-  focusedContentIds
+  highlightedContentIds
 }: {
   activeCategory: (typeof monitorCategories)[number];
-  activeTopic: TopicIdea | null;
-  focusedContentIds: string[];
+  highlightedContentIds: string[];
 }) {
   const focusedContent = activeCategory.content.filter((content) =>
-    focusedContentIds.includes(content.id)
+    highlightedContentIds.includes(content.id)
   );
+
+  if (highlightedContentIds.length === 0) {
+    return (
+      <section
+        className="workbench-shell__hero-card"
+        aria-label={`${activeCategory.name} 支撑内容`}
+      >
+        <div className="workbench-shell__panel-kicker">内容</div>
+        <h2>{`${activeCategory.name} 支撑内容聚焦`}</h2>
+        <p>请先从选题报告中点击 查看支撑内容。</p>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -51,13 +62,7 @@ function FocusedContentBridge({
     >
       <div className="workbench-shell__panel-kicker">内容</div>
       <h2>{`${activeCategory.name} 支撑内容聚焦`}</h2>
-      <p>
-        {focusedContentIds.length > 0
-          ? `已聚焦 ${focusedContentIds.length} 条支撑内容，源自 ${
-              activeTopic?.title ?? "当前选题"
-            }。`
-          : "当前没有可聚焦的支撑内容。"}
-      </p>
+      <p>{`已聚焦 ${highlightedContentIds.length} 条支撑内容。`}</p>
       <div className="workbench-shell__action-deck">
         {focusedContent.map((content) => (
           <article key={content.id} className="workbench-shell__workspace-card">
@@ -117,11 +122,6 @@ export function MonitoringWorkbench() {
     activeCategory,
     workbenchState.selectedReportDate
   );
-  const activeTopic =
-    activeReport.topics.find((topic) => topic.id === workbenchState.focusedTopicId) ??
-    activeReport.topics[0] ??
-    null;
-  const focusedContentIds = activeTopic ? getLinkedContentIds(activeTopic) : [];
 
   function handleOpenEvidence(topic: TopicIdea, report: DailyReport) {
     const linkedContentIds = getLinkedContentIds(topic);
@@ -182,9 +182,7 @@ export function MonitoringWorkbench() {
                   setWorkbenchState((current) => ({
                     ...current,
                     selectedReportDate,
-                    focusedTopicId:
-                      getCurrentDailyReport(activeCategory, selectedReportDate).topics[0]
-                        ?.id ?? null,
+                    focusedTopicId: null,
                     highlightedContentIds: []
                   }))
                 }
@@ -195,8 +193,7 @@ export function MonitoringWorkbench() {
           ) : workbenchState.activeTab === "content" ? (
             <FocusedContentBridge
               activeCategory={activeCategory}
-              activeTopic={activeTopic}
-              focusedContentIds={focusedContentIds}
+              highlightedContentIds={workbenchState.highlightedContentIds}
             />
           ) : (
             <SettingsBridge activeCategory={activeCategory} />
