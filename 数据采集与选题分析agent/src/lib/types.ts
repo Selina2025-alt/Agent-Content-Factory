@@ -3,6 +3,9 @@ export type ReportView = "daily" | "summary";
 export type PlatformId = "all" | "douyin" | "xiaohongshu" | "weibo" | "bilibili";
 export type NonAggregatePlatformId = Exclude<PlatformId, "all">;
 export type TimeOfDay = "上午" | "下午" | "晚上";
+export type ContentRangeId = "24h" | "3d" | "7d";
+export type ContentPoolView = "all" | "hot" | "pool";
+export type ContentFocusMode = "evidence" | "samples" | "timeline" | null;
 
 export interface ActionItem {
   id: string;
@@ -12,6 +15,7 @@ export interface ActionItem {
   priority: "P1" | "P2" | "P3";
   sourceLabel: string;
   evidenceLabel: string;
+  linkedTopicIds: string[];
 }
 
 export interface InsightEvidence {
@@ -150,6 +154,11 @@ export interface WorkbenchState {
   selectedReportDate: string;
   selectedContentDate: string;
   selectedPlatformId: PlatformId;
+  selectedContentRange: ContentRangeId;
+  contentPoolView: ContentPoolView;
+  contentFocusMode: ContentFocusMode;
   focusedTopicId: string | null;
   highlightedContentIds: string[];
+  pooledContentIds: string[];
+  pendingActionIds: string[];
 }

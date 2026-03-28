@@ -192,7 +192,8 @@ function makeActionItem(
   summary: string,
   priority: ActionItem["priority"],
   sourceLabel: string,
-  evidenceLabel: string
+  evidenceLabel: string,
+  linkedTopicIds: string[]
 ): ActionItem {
   return {
     id,
@@ -201,7 +202,8 @@ function makeActionItem(
     summary,
     priority,
     sourceLabel,
-    evidenceLabel
+    evidenceLabel,
+    linkedTopicIds
   };
 }
 
@@ -316,7 +318,8 @@ const claudecodeActionItems = [
     "优先把三平台共通的工作流路径整理成系列选题，方便快速复用到不同内容形态。",
     "P1",
     "日报热点",
-    "3 条跨平台样本同时抬头"
+    "3 条跨平台样本同时抬头",
+    ["cc-topic-0326-workflow"]
   ),
   makeActionItem(
     "cc-action-2",
@@ -325,7 +328,8 @@ const claudecodeActionItems = [
     "关注用户是否开始从 Claude Code 本身转向工具链和配置方法，避免选题停留在概念层。",
     "P2",
     "评论区追问",
-    "多条内容要求完整搭建方案"
+    "多条内容要求完整搭建方案",
+    ["cc-topic-0326-toolchain"]
   ),
   makeActionItem(
     "cc-action-3",
@@ -334,7 +338,8 @@ const claudecodeActionItems = [
     "模板型选题容易过度包装，后续需要保持实操感，避免只剩标题党。",
     "P3",
     "选题复核",
-    "收藏率高但落地感参差"
+    "收藏率高但落地感参差",
+    ["cc-topic-0325-prompt-library"]
   )
 ] satisfies ActionItem[];
 
@@ -603,7 +608,8 @@ const vibecodingActionItems = [
     "把「先演示、后解释」的表达套路整理成稳定栏目，方便持续追更。",
     "P1",
     "日报洞察",
-    "多平台同时出现过程展示"
+    "多平台同时出现过程展示",
+    ["vc-topic-0326-demo-workflow"]
   ),
   makeActionItem(
     "vc-action-2",
@@ -612,7 +618,8 @@ const vibecodingActionItems = [
     "关注内容是否已经从工具炫技转向产品验证、收入验证和周报式记录。",
     "P2",
     "趋势信号",
-    "用户开始问能否直接做成产品"
+    "用户开始问能否直接做成产品",
+    ["vc-topic-0326-indie-build"]
   ),
   makeActionItem(
     "vc-action-3",
@@ -621,7 +628,8 @@ const vibecodingActionItems = [
     "审美型选题很容易写得过散，后续需要保留明确的工具和场景锚点。",
     "P3",
     "内容复核",
-    "收藏型素材较多"
+    "收藏型素材较多",
+    ["vc-topic-0324-taste-tools"]
   )
 ] satisfies ActionItem[];
 

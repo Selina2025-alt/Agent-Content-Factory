@@ -1,4 +1,5 @@
 import { DateStrip, type DateStripItem } from "@/components/workbench/date-strip";
+import { ReportTopicCard } from "@/components/workbench/report-topic-card";
 import type { DailyReport, MonitorCategory, ReportView, TopicIdea } from "@/lib/types";
 
 interface ReportTabProps {
@@ -7,8 +8,11 @@ interface ReportTabProps {
   reportView: ReportView;
   onReportViewChange: (view: ReportView) => void;
   selectedReportDate: string;
+  focusedTopicId: string | null;
   onSelectReportDate: (date: string) => void;
   onOpenEvidence: (topic: TopicIdea) => void;
+  onOpenSamples: (topic: TopicIdea) => void;
+  onOpenTimeline: (topic: TopicIdea) => void;
 }
 
 function buildDateItems(reports: DailyReport[]): DateStripItem[] {
@@ -27,15 +31,24 @@ export function ReportTab({
   reportView,
   onReportViewChange,
   selectedReportDate,
+  focusedTopicId,
   onSelectReportDate,
-  onOpenEvidence
+  onOpenEvidence,
+  onOpenSamples,
+  onOpenTimeline
 }: ReportTabProps) {
   const reportDates = buildDateItems(activeCategory.reports);
 
   return (
-    <section className="workbench-shell__hero-card" aria-label={`${activeCategory.name} 报告`}>
+    <section
+      className="workbench-shell__hero-card workbench-shell__hero-card--report"
+      aria-label={`${activeCategory.name} 报告`}
+    >
       <div className="workbench-shell__panel-kicker">选题分析与报告</div>
-      <h2>{`${activeCategory.name} 报告`}</h2>
+      <div className="workbench-shell__section-heading">
+        <h2>最新日报与证据链</h2>
+        <p>先扫最近几天，再点进最值得看的那一天。</p>
+      </div>
 
       <DateStrip
         items={reportDates}
@@ -71,7 +84,7 @@ export function ReportTab({
       </div>
 
       {reportView === "daily" ? (
-        <div className="workbench-shell__insight-stack">
+        <div className="workbench-shell__report-summary-grid">
           <article className="workbench-shell__insight-card">
             <span>热度摘要</span>
             <strong>{report.hotSummary}</strong>
@@ -90,7 +103,7 @@ export function ReportTab({
           </article>
         </div>
       ) : (
-        <div className="workbench-shell__insight-stack">
+        <div className="workbench-shell__report-summary-grid">
           <article className="workbench-shell__insight-card">
             <span>汇总视图</span>
             <strong>
@@ -105,24 +118,16 @@ export function ReportTab({
         </div>
       )}
 
-      <div className="workbench-shell__action-deck">
+      <div className="workbench-shell__topic-grid">
         {report.topics.map((topic) => (
-          <article key={topic.id} className="workbench-shell__workspace-card">
-            <span>
-              {topic.confidence} · {topic.evidenceCount} 条支撑内容
-            </span>
-            <strong>{topic.title}</strong>
-            <p>{topic.brief}</p>
-            <small>{topic.whyNow}</small>
-            <button
-              type="button"
-              className="workbench-shell__tab"
-              aria-label={`查看支撑内容：${topic.title}`}
-              onClick={() => onOpenEvidence(topic)}
-            >
-              查看支撑内容
-            </button>
-          </article>
+          <ReportTopicCard
+            key={topic.id}
+            topic={topic}
+            isFocused={focusedTopicId === topic.id}
+            onOpenEvidence={onOpenEvidence}
+            onOpenSamples={onOpenSamples}
+            onOpenTimeline={onOpenTimeline}
+          />
         ))}
       </div>
     </section>

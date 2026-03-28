@@ -37,14 +37,12 @@ describe("report evidence bridge", () => {
 
     await user.click(screen.getByRole("tab", { name: "内容" }));
 
-    expect(
-      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(/先用平台、时间范围和内容池筛选缩小范围/).length).toBeGreaterThan(0);
     const platformFilterGroup = screen.getByRole("group", { name: "平台筛选" });
     expect(platformFilterGroup).toBeInTheDocument();
 
     await user.click(
-      within(platformFilterGroup).getByRole("button", { name: stalePlatform!.label })
+      within(platformFilterGroup).getByRole("button", { name: new RegExp(stalePlatform!.label) })
     );
 
     await user.click(screen.getByRole("tab", { name: "选题分析与报告" }));
@@ -64,19 +62,15 @@ describe("report evidence bridge", () => {
     expect(screen.getByRole("tab", { name: "内容", selected: true })).toBeInTheDocument();
     expect(
       within(screen.getByRole("group", { name: "平台筛选" })).getByRole("button", {
-        name: "全部"
+        name: /全部/
       })
     ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length).toBeGreaterThan(0);
     expect(screen.getByText(linkedContent!.title)).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "内容" }));
 
-    expect(
-      screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length).toBeGreaterThan(0);
     expect(screen.getByText(linkedContent!.title)).toBeInTheDocument();
   });
 });

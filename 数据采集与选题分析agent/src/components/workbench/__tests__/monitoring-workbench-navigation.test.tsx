@@ -51,7 +51,7 @@ describe("MonitoringWorkbench navigation", () => {
       })
     ).toBeInTheDocument();
     expect(
-      within(main).getByRole("heading", {
+      within(main).getByRole("region", {
         name: `今日最值得跟进的 ${vibecodingCategory.actionItems.length} 个选题`
       })
     ).toBeInTheDocument();
@@ -59,10 +59,13 @@ describe("MonitoringWorkbench navigation", () => {
       within(main).getByText(vibecodingCategory.actionItems[0].title)
     ).toBeInTheDocument();
     expect(
-      within(rightRail).getByText(vibecodingCategory.decisionSignals.priorityDistribution[0])
+      within(rightRail).getByText("优先级分布")
     ).toBeInTheDocument();
     expect(
-      within(rightRail).getByText(vibecodingCategory.decisionSignals.anomalySignals[0])
+      within(rightRail).getByText("平台波动")
+    ).toBeInTheDocument();
+    expect(
+      within(rightRail).getByText(vibecodingCategory.decisionSignals.reviewItems[0])
     ).toBeInTheDocument();
   });
 

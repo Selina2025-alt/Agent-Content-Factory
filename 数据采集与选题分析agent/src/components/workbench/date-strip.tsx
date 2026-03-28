@@ -18,7 +18,7 @@ export function DateStrip({
   onSelectDate
 }: DateStripProps) {
   return (
-    <div className="workbench-shell__action-deck" aria-label="报告日期">
+    <div className="workbench-shell__date-strip" aria-label="报告日期">
       {items.map((item) => {
         const isSelected = item.date === selectedDate;
 
@@ -29,8 +29,8 @@ export function DateStrip({
             aria-pressed={isSelected}
             className={
               isSelected
-                ? "workbench-shell__workspace-card is-active"
-                : "workbench-shell__workspace-card"
+                ? "workbench-shell__date-card is-active"
+                : "workbench-shell__date-card"
             }
             onClick={() => onSelectDate(item.date)}
           >

@@ -13,6 +13,9 @@ const compat = new FlatCompat({
 });
 
 const config = [
+  {
+    ignores: [".next/**"]
+  },
   ...compat.config(nextVitals),
   {
     rules: {

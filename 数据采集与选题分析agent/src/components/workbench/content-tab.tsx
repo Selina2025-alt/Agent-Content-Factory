@@ -1,178 +1,253 @@
 "use client";
 
-import { DateStrip, type DateStripItem } from "@/components/workbench/date-strip";
-import type { ContentItem, MonitorCategory, PlatformId } from "@/lib/types";
+import { ContentFilterBar } from "@/components/workbench/content-filter-bar";
+import { ContentPool } from "@/components/workbench/content-pool";
+import { ContentTrendStrip } from "@/components/workbench/content-trend-strip";
+import {
+  ContentFocusMode,
+  ContentItem,
+  ContentPoolView,
+  ContentRangeId,
+  MonitorCategory,
+  NonAggregatePlatformId,
+  PlatformId
+} from "@/lib/types";
 
 interface ContentTabProps {
   activeCategory: MonitorCategory;
   selectedContentDate: string;
   selectedPlatformId: PlatformId;
+  selectedContentRange: ContentRangeId;
+  contentPoolView: ContentPoolView;
+  contentFocusMode: ContentFocusMode;
   highlightedContentIds: string[];
+  pooledContentIds: string[];
   onSelectContentDate: (date: string) => void;
   onSelectPlatformId: (platformId: PlatformId) => void;
+  onSelectContentRange: (range: ContentRangeId) => void;
+  onSelectContentPoolView: (view: ContentPoolView) => void;
   onOpenLinkedInsight: (content: ContentItem) => void;
+  onTogglePool: (content: ContentItem) => void;
 }
 
-function buildDateItems(content: ContentItem[]): DateStripItem[] {
-  const contentDates = new Map<
-    string,
-    {
-      count: number;
-      platforms: Set<string>;
-    }
-  >();
-
-  for (const item of content) {
-    const existing = contentDates.get(item.date);
-
-    if (existing) {
-      existing.count += 1;
-      existing.platforms.add(item.platformId);
-      continue;
-    }
-
-    contentDates.set(item.date, {
-      count: 1,
-      platforms: new Set([item.platformId])
-    });
-  }
-
-  return [...contentDates.entries()]
-    .sort(([leftDate], [rightDate]) => rightDate.localeCompare(leftDate))
-    .map(([date, summary]) => ({
-      date,
-      label: `${summary.count} 条内容`,
-      detail: `${summary.platforms.size} 个平台`
-    }));
+function getSortedDates(content: ContentItem[]) {
+  return [...new Set(content.map((item) => item.date))].sort((left, right) =>
+    right.localeCompare(left)
+  );
 }
 
-function buildPlatformItems(activeCategory: MonitorCategory) {
+function getVisibleDates(content: ContentItem[], selectedRange: ContentRangeId) {
+  const sortedDates = getSortedDates(content);
+  const rangeLimit = selectedRange === "24h" ? 1 : selectedRange === "3d" ? 3 : 7;
+
+  return sortedDates.slice(0, rangeLimit);
+}
+
+function buildPlatformItems(activeCategory: MonitorCategory, visibleDates: string[]) {
+  const visibleDateSet = new Set(visibleDates);
+  const visibleContent = activeCategory.content.filter((content) =>
+    visibleDateSet.has(content.date)
+  );
+
   return [
-    { id: "all" as const, label: "全部" },
+    { id: "all" as const, label: "全部", count: visibleContent.length },
     ...activeCategory.settings.platforms.map((platform) => ({
       id: platform.id,
-      label: platform.label
+      label: platform.label,
+      count: visibleContent.filter((content) => content.platformId === platform.id).length
     }))
   ];
 }
 
-function resolveSelectedDate(contentDates: DateStripItem[], selectedDate: string) {
-  return contentDates.some((item) => item.date === selectedDate)
-    ? selectedDate
-    : contentDates[0]?.date ?? "";
+function buildTrendItems(activeCategory: MonitorCategory, visibleDates: string[]) {
+  const platformLabelMap = new Map<NonAggregatePlatformId, string>(
+    activeCategory.settings.platforms.map((platform) => [platform.id, platform.label])
+  );
+
+  return visibleDates.map((date) => {
+    const contentForDate = activeCategory.content.filter((content) => content.date === date);
+    const hotCount = contentForDate.filter((content) => content.heatScore >= 85).length;
+    const platformCounts = new Map<string, number>();
+
+    for (const content of contentForDate) {
+      platformCounts.set(content.platformId, (platformCounts.get(content.platformId) ?? 0) + 1);
+    }
+
+    const leadPlatformId =
+      [...platformCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? "all";
+
+    return {
+      date,
+      contentCount: contentForDate.length,
+      hotCount,
+      leadPlatformLabel:
+        leadPlatformId === "all"
+          ? "全平台"
+          : platformLabelMap.get(leadPlatformId as NonAggregatePlatformId) ?? "全平台"
+    };
+  });
+}
+
+function resolveSelectedDate(visibleDates: string[], selectedDate: string) {
+  return visibleDates.includes(selectedDate) ? selectedDate : visibleDates[0] ?? "";
 }
 
 function buildVisibleContent({
   activeCategory,
-  selectedContentDate,
-  selectedPlatformId
-}: Pick<
-  ContentTabProps,
-  "activeCategory" | "selectedContentDate" | "selectedPlatformId"
->) {
+  selectedDate,
+  selectedPlatformId,
+  contentPoolView,
+  contentFocusMode,
+  highlightedContentIds,
+  pooledContentIds,
+  visibleDates
+}: {
+  activeCategory: MonitorCategory;
+  selectedDate: string;
+  selectedPlatformId: PlatformId;
+  contentPoolView: ContentPoolView;
+  contentFocusMode: ContentFocusMode;
+  highlightedContentIds: string[];
+  pooledContentIds: string[];
+  visibleDates: string[];
+}) {
+  const visibleDateSet = new Set(visibleDates);
+  const highlightedIdSet = new Set(highlightedContentIds);
+  const pooledIdSet = new Set(pooledContentIds);
+
   return activeCategory.content
-    .filter((content) => content.date === selectedContentDate)
+    .filter((content) => {
+      if (contentFocusMode === "timeline" && highlightedContentIds.length > 0) {
+        return highlightedIdSet.has(content.id);
+      }
+
+      return content.date === selectedDate && visibleDateSet.has(content.date);
+    })
     .filter(
       (content) => selectedPlatformId === "all" || content.platformId === selectedPlatformId
     )
+    .filter((content) => {
+      if (contentPoolView === "hot") {
+        return content.heatScore >= 85;
+      }
+
+      if (contentPoolView === "pool") {
+        return pooledIdSet.has(content.id);
+      }
+
+      return true;
+    })
     .slice()
-    .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt));
+    .sort((left, right) => {
+      if (contentFocusMode === "timeline" && right.date !== left.date) {
+        return right.date.localeCompare(left.date);
+      }
+
+      if (right.heatScore !== left.heatScore) {
+        return right.heatScore - left.heatScore;
+      }
+
+      return right.publishedAt.localeCompare(left.publishedAt);
+    });
+}
+
+function buildFocusDescription(mode: ContentFocusMode, highlightedCount: number) {
+  if (mode === "evidence" && highlightedCount > 0) {
+    return `已聚焦 ${highlightedCount} 条支撑内容，可直接判断这条洞察为什么成立。`;
+  }
+
+  if (mode === "samples" && highlightedCount > 0) {
+    return `已定位 ${highlightedCount} 条原始爆款样本，先看最热素材，再决定要不要跟进。`;
+  }
+
+  if (mode === "timeline" && highlightedCount > 0) {
+    return "已切换到同类内容时间线，先扫最近几天的连续信号，再深入看单条素材。";
+  }
+
+  return "先用平台、时间范围和内容池筛选缩小范围，再进入具体素材判断。";
 }
 
 export function ContentTab({
   activeCategory,
   selectedContentDate,
   selectedPlatformId,
+  selectedContentRange,
+  contentPoolView,
+  contentFocusMode,
   highlightedContentIds,
+  pooledContentIds,
   onSelectContentDate,
   onSelectPlatformId,
-  onOpenLinkedInsight
+  onSelectContentRange,
+  onSelectContentPoolView,
+  onOpenLinkedInsight,
+  onTogglePool
 }: ContentTabProps) {
-  const dateItems = buildDateItems(activeCategory.content);
-  const resolvedSelectedDate = resolveSelectedDate(dateItems, selectedContentDate);
+  const visibleDates = getVisibleDates(activeCategory.content, selectedContentRange);
+  const resolvedSelectedDate = resolveSelectedDate(visibleDates, selectedContentDate);
+  const trendItems = buildTrendItems(activeCategory, visibleDates);
+  const platformItems = buildPlatformItems(activeCategory, visibleDates);
+  const selectedPlatformLabel =
+    platformItems.find((platform) => platform.id === selectedPlatformId)?.label ?? "全部";
   const visibleContent = buildVisibleContent({
     activeCategory,
-    selectedContentDate: resolvedSelectedDate,
-    selectedPlatformId
+    selectedDate: resolvedSelectedDate,
+    selectedPlatformId,
+    contentPoolView,
+    contentFocusMode,
+    highlightedContentIds,
+    pooledContentIds,
+    visibleDates
   });
-  const platformItems = buildPlatformItems(activeCategory);
+  const poolDescription = buildFocusDescription(contentFocusMode, highlightedContentIds.length);
+  const poolTitle =
+    contentFocusMode === "timeline"
+      ? "同类内容时间线"
+      : `${resolvedSelectedDate || "--"} · ${selectedPlatformId === "all" ? "全平台" : selectedPlatformLabel} · ${visibleContent.length} 条内容`;
 
   return (
-    <section className="workbench-shell__hero-card" aria-label={`${activeCategory.name} 支撑内容`}>
+    <section className="workbench-shell__hero-card workbench-shell__hero-card--content">
       <div className="workbench-shell__panel-kicker">内容</div>
-      <h2>{`${activeCategory.name} 支撑内容`}</h2>
+      <div className="workbench-shell__section-heading">
+        <h2>内容监控与素材池</h2>
+        <p>{poolDescription}</p>
+      </div>
 
-      {highlightedContentIds.length > 0 ? (
-        <p>{`已聚焦 ${highlightedContentIds.length} 条支撑内容。`}</p>
-      ) : (
-        <p>从选题分析里点开任意主题后，这里会展示对应的内容卡片。</p>
-      )}
+      <ContentFilterBar
+        platforms={platformItems}
+        ranges={[
+          { id: "24h", label: "近24小时" },
+          { id: "3d", label: "近3天" },
+          { id: "7d", label: "近7天" }
+        ]}
+        poolViews={[
+          { id: "all", label: "全部内容" },
+          { id: "hot", label: "只看热点" },
+          { id: "pool", label: "只看已入选题池" }
+        ]}
+        selectedPlatformId={selectedPlatformId}
+        selectedRangeId={selectedContentRange}
+        selectedPoolView={contentPoolView}
+        onSelectPlatformId={onSelectPlatformId}
+        onSelectRangeId={onSelectContentRange}
+        onSelectPoolView={onSelectContentPoolView}
+      />
 
-      <DateStrip
-        items={dateItems}
+      <ContentTrendStrip
+        items={trendItems}
         selectedDate={resolvedSelectedDate}
         onSelectDate={onSelectContentDate}
       />
 
-      <div className="workbench-shell__header-meta" role="group" aria-label="平台筛选">
-        {platformItems.map((platform) => {
-          const isSelected = platform.id === selectedPlatformId;
-
-          return (
-            <button
-              key={platform.id}
-              type="button"
-              className={isSelected ? "workbench-shell__tab is-active" : "workbench-shell__tab"}
-              aria-pressed={isSelected}
-              onClick={() => onSelectPlatformId(platform.id)}
-            >
-              {platform.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="workbench-shell__action-deck" aria-label="内容卡片">
-        {visibleContent.length === 0 ? (
-          <article className="workbench-shell__workspace-card">
-            <span>暂无内容</span>
-            <strong>当前日期和平台下没有匹配的内容。</strong>
-          </article>
-        ) : (
-          visibleContent.map((content) => {
-            const isFocused = highlightedContentIds.includes(content.id);
-
-            return (
-              <article
-                key={content.id}
-                className={
-                  isFocused
-                    ? "workbench-shell__workspace-card is-active"
-                    : "workbench-shell__workspace-card"
-                }
-              >
-                <span>
-                  {content.publishedAt} · {content.platformId}
-                </span>
-                <strong>{content.title}</strong>
-                <p>{content.aiSummary}</p>
-                <small>
-                  {content.author} · 热度 {content.heatScore} ·{" "}
-                  {content.metrics.likes} 赞
-                </small>
-                <button
-                  type="button"
-                  className="workbench-shell__tab"
-                  aria-label={`查看关联洞察：${content.title}`}
-                  onClick={() => onOpenLinkedInsight(content)}
-                >
-                  查看关联洞察
-                </button>
-              </article>
-            );
-          })
-        )}
-      </div>
+      <ContentPool
+        title={poolTitle}
+        description={poolDescription}
+        items={visibleContent}
+        highlightedContentIds={highlightedContentIds}
+        pooledContentIds={pooledContentIds}
+        onOpenLinkedInsight={onOpenLinkedInsight}
+        onTogglePool={onTogglePool}
+      />
     </section>
   );
 }

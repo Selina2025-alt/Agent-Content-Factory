@@ -32,9 +32,7 @@ describe("content insight bridge", () => {
     );
 
     expect(screen.getByRole("tab", { name: "内容", selected: true })).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length).toBeGreaterThan(0);
     expect(screen.getByText(linkedContent!.title)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: `查看关联洞察：${linkedContent!.title}` }));
@@ -50,15 +48,14 @@ describe("content insight bridge", () => {
     await user.click(screen.getByRole("tab", { name: "内容" }));
 
     expect(
-      screen.queryByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).not.toBeInTheDocument();
+      screen.queryAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length
+    ).toBe(0);
+    expect(screen.getAllByText(/先用平台、时间范围和内容池筛选缩小范围/).length).toBeGreaterThan(0);
     expect(
-      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "全部" })).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+      screen
+        .getByRole("group", { name: "平台筛选" })
+        .querySelector('[aria-pressed="true"]')
+    ).toHaveTextContent(/全部/);
   });
 
   it("exits focused evidence mode when manual browsing changes the content date", async () => {
@@ -78,17 +75,13 @@ describe("content insight bridge", () => {
       screen.getByRole("button", { name: `查看支撑内容：${topic.title}` })
     );
 
-    expect(
-      screen.getByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).toBeInTheDocument();
+    expect(screen.getAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: new RegExp(alternateDate!) }));
 
     expect(
-      screen.queryByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`))
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/从选题分析里点开任意主题后，这里会展示对应的内容卡片/)
-    ).toBeInTheDocument();
+      screen.queryAllByText(new RegExp(`已聚焦 ${linkedContentIds.length} 条支撑内容`)).length
+    ).toBe(0);
+    expect(screen.getAllByText(/先用平台、时间范围和内容池筛选缩小范围/).length).toBeGreaterThan(0);
   });
 });
