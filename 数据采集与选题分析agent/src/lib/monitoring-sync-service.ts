@@ -19,9 +19,13 @@ import {
   searchXiaohongshuNotesSnapshotByKeyword,
   type XiaohongshuNotesSnapshot
 } from "@/lib/xiaohongshu-monitor";
+import {
+  searchTwitterPostsSnapshotByKeyword,
+  type TwitterPostsSnapshot
+} from "@/lib/twitter-monitor";
 import type { ContentItem } from "@/lib/types";
 
-export type SyncablePlatformId = "wechat" | "xiaohongshu";
+export type SyncablePlatformId = "wechat" | "xiaohongshu" | "twitter";
 
 interface RefreshKeywordTargetPlatformInput {
   repository: MonitoringRepository;
@@ -31,6 +35,7 @@ interface RefreshKeywordTargetPlatformInput {
   triggerType?: "manual_refresh" | "keyword_created";
   wechatSearch?: typeof searchWechatArticlesSnapshotByKeyword;
   xiaohongshuSearch?: typeof searchXiaohongshuNotesSnapshotByKeyword;
+  twitterSearch?: typeof searchTwitterPostsSnapshotByKeyword;
   now?: () => string;
   randomId?: () => string;
 }
@@ -44,10 +49,31 @@ interface StoredContentQuery {
 }
 
 type PlatformSearchSnapshot = WechatArticlesSnapshot | XiaohongshuNotesSnapshot;
-export type PlatformContentSnapshot = PlatformSearchSnapshot & {
-  searchQueryId: string;
+type PlatformSearchSnapshotWithTwitter = PlatformSearchSnapshot | TwitterPostsSnapshot;
+
+interface PlatformContentSnapshotBase {
   fetchedCount: number;
   cappedCount: number;
+  rawItems: ContentItem[];
+  items: ContentItem[];
+}
+
+export interface WechatContentSnapshot extends PlatformContentSnapshotBase {
+  platformId: "wechat";
+}
+
+export interface XiaohongshuContentSnapshot extends PlatformContentSnapshotBase {
+  platformId: "xiaohongshu";
+}
+
+export interface TwitterContentSnapshot extends PlatformContentSnapshotBase {
+  searchQueryId: string;
+  platformId: "twitter";
+}
+
+export type PlatformContentSnapshot = PlatformContentSnapshotBase & {
+  searchQueryId: string;
+  platformId: SyncablePlatformId;
 };
 export const MAX_CONTENT_ITEMS_PER_KEYWORD_PLATFORM = 20;
 
@@ -61,8 +87,9 @@ async function runPlatformSearch(
   services: {
     wechatSearch: typeof searchWechatArticlesSnapshotByKeyword;
     xiaohongshuSearch: typeof searchXiaohongshuNotesSnapshotByKeyword;
+    twitterSearch: typeof searchTwitterPostsSnapshotByKeyword;
   }
-): Promise<PlatformSearchSnapshot> {
+): Promise<PlatformSearchSnapshotWithTwitter> {
   if (platformId === "wechat") {
     return services.wechatSearch(keyword, 1, 7);
   }
@@ -71,10 +98,14 @@ async function runPlatformSearch(
     return services.xiaohongshuSearch(keyword, 1, "week");
   }
 
+  if (platformId === "twitter") {
+    return services.twitterSearch(keyword);
+  }
+
   throw new Error(`Unsupported platform sync: ${platformId}`);
 }
 
-function capSnapshot(snapshot: PlatformSearchSnapshot): PlatformContentSnapshot {
+function capSnapshot(snapshot: PlatformSearchSnapshot): PlatformContentSnapshotBase {
   const fetchedCount = snapshot.items.length;
   const items = snapshot.items.slice(0, MAX_CONTENT_ITEMS_PER_KEYWORD_PLATFORM);
   const keptIds = new Set(items.map((item) => item.id));
@@ -83,7 +114,6 @@ function capSnapshot(snapshot: PlatformSearchSnapshot): PlatformContentSnapshot 
     .sort((left, right) => (left.rawOrderIndex ?? 0) - (right.rawOrderIndex ?? 0));
 
   return {
-    searchQueryId: "",
     rawItems,
     items,
     fetchedCount,
@@ -139,12 +169,14 @@ export async function refreshKeywordTargetPlatform(
   try {
     const rawSnapshot = await runPlatformSearch(input.platformId, input.keywordTarget.keyword, {
       wechatSearch: input.wechatSearch ?? searchWechatArticlesSnapshotByKeyword,
-      xiaohongshuSearch: input.xiaohongshuSearch ?? searchXiaohongshuNotesSnapshotByKeyword
+      xiaohongshuSearch: input.xiaohongshuSearch ?? searchXiaohongshuNotesSnapshotByKeyword,
+      twitterSearch: input.twitterSearch ?? searchTwitterPostsSnapshotByKeyword
     });
     const snapshot = {
       ...capSnapshot(rawSnapshot),
-      searchQueryId
-    };
+      searchQueryId,
+      platformId: input.platformId
+    } satisfies PlatformContentSnapshot;
     const finishedAt = now();
 
     upsertCollectedContents(input.repository, {

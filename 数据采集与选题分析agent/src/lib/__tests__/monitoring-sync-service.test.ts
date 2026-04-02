@@ -6,6 +6,7 @@ import {
   createMonitoringRepository,
   initializeMonitoringDatabase,
   listCollectedContents,
+  listCollectedContentsBySearchQuery,
   listKeywordTargets,
   listSearchQueries,
   upsertKeywordTarget
@@ -44,6 +45,7 @@ describe("monitoring sync service", () => {
       categoryId: "claude",
       keywordTarget: {
         id: "target-1",
+        categoryId: "claude",
         keyword: "openclaw",
         platformIds: ["xiaohongshu"],
         createdAt: "2026-03-31T09:00:00.000Z",
@@ -112,6 +114,7 @@ describe("monitoring sync service", () => {
       categoryId: "claude",
       keywordTarget: {
         id: "target-1",
+        categoryId: "claude",
         keyword: "openclaw",
         platformIds: ["wechat"],
         createdAt: "2026-03-31T09:00:00.000Z",
@@ -136,6 +139,169 @@ describe("monitoring sync service", () => {
 
     expect(stored).toHaveLength(1);
     expect(stored[0]?.title).toBe("wechat newer");
+
+    repository.database.close();
+  });
+
+  it("refreshes twitter content and writes the search query snapshot", async () => {
+    const repository = createMonitoringRepository(initializeMonitoringDatabase(":memory:"));
+
+    upsertKeywordTarget(repository, {
+      id: "target-twitter",
+      categoryId: "claude",
+      keyword: "claude code",
+      platformIds: ["twitter"],
+      createdAt: "2026-03-31T09:00:00.000Z",
+      lastRunAt: null,
+      lastRunStatus: "idle",
+      lastResultCount: 0
+    });
+
+    const searchTwitter = vi.fn().mockResolvedValue({
+      rawItems: [
+        buildContentItem("tweet-old", "tweet old", 1711872000, "twitter", 0),
+        buildContentItem("tweet-new", "tweet new", 1711958400, "twitter", 1)
+      ],
+      items: [
+        buildContentItem("tweet-new", "tweet new", 1711958400, "twitter", 1),
+        buildContentItem("tweet-old", "tweet old", 1711872000, "twitter", 0)
+      ]
+    });
+
+    const result = await refreshKeywordTargetPlatform({
+      repository,
+      categoryId: "claude",
+      keywordTarget: {
+        id: "target-twitter",
+        categoryId: "claude",
+        keyword: "claude code",
+        platformIds: ["twitter"],
+        createdAt: "2026-03-31T09:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      },
+      platformId: "twitter",
+      twitterSearch: searchTwitter,
+      now: () => "2026-03-31T09:15:00.000Z",
+      randomId: () => "run-twitter"
+    });
+
+    expect(searchTwitter).toHaveBeenCalledWith("claude code");
+    expect(result.items.map((item) => item.title)).toEqual(["tweet new", "tweet old"]);
+
+    const stored = listCollectedContents(repository, {
+      categoryId: "claude",
+      keywordTargetId: "target-twitter",
+      platformId: "twitter"
+    });
+    expect(stored.map((item) => item.title)).toEqual(["tweet new", "tweet old"]);
+
+    const snapshotItems = listCollectedContentsBySearchQuery(repository, {
+      searchQueryId: result.searchQueryId,
+      platformId: "twitter"
+    });
+    expect(snapshotItems.map((item) => item.title)).toEqual(["tweet old", "tweet new"]);
+
+    const searchQueries = listSearchQueries(repository, "claude");
+    expect(searchQueries[0]).toMatchObject({
+      platformScope: "twitter",
+      status: "success",
+      fetchedCount: 2,
+      cappedCount: 2
+    });
+
+    repository.database.close();
+  });
+
+  it("marks twitter sync runs as failed when the search throws", async () => {
+    const repository = createMonitoringRepository(initializeMonitoringDatabase(":memory:"));
+
+    upsertKeywordTarget(repository, {
+      id: "target-twitter",
+      categoryId: "claude",
+      keyword: "claude code",
+      platformIds: ["twitter"],
+      createdAt: "2026-03-31T09:00:00.000Z",
+      lastRunAt: null,
+      lastRunStatus: "idle",
+      lastResultCount: 0
+    });
+
+    const error = new Error("twitter search failed");
+
+    await expect(
+      refreshKeywordTargetPlatform({
+      repository,
+      categoryId: "claude",
+      keywordTarget: {
+        id: "target-twitter",
+        categoryId: "claude",
+        keyword: "claude code",
+        platformIds: ["twitter"],
+        createdAt: "2026-03-31T09:00:00.000Z",
+          lastRunAt: null,
+          lastRunStatus: "idle",
+          lastResultCount: 0
+        },
+        platformId: "twitter",
+        twitterSearch: vi.fn().mockRejectedValue(error),
+        now: () => "2026-03-31T09:15:00.000Z",
+        randomId: () => "run-twitter-failed"
+      })
+    ).rejects.toThrow("twitter search failed");
+
+    const syncRun = repository.database
+      .prepare(
+        `SELECT status, result_count, error_message, finished_at
+         FROM sync_runs
+         WHERE id = ?`
+      )
+      .get("run-twitter-failed") as
+      | {
+          status: string;
+          result_count: number;
+          error_message: string | null;
+          finished_at: string | null;
+        }
+      | undefined;
+
+    const searchQuery = repository.database
+      .prepare(
+        `SELECT status, fetched_count, capped_count, error_message, finished_at
+         FROM search_queries
+         WHERE id = ?`
+      )
+      .get("query-run-twitter-failed") as
+      | {
+          status: string;
+          fetched_count: number;
+          capped_count: number;
+          error_message: string | null;
+          finished_at: string | null;
+        }
+      | undefined;
+
+    const keywordTarget = listKeywordTargets(repository, "claude")[0];
+
+    expect(syncRun).toMatchObject({
+      status: "failed",
+      result_count: 0,
+      error_message: "twitter search failed",
+      finished_at: "2026-03-31T09:15:00.000Z"
+    });
+    expect(searchQuery).toMatchObject({
+      status: "failed",
+      fetched_count: 0,
+      capped_count: 0,
+      error_message: "twitter search failed",
+      finished_at: "2026-03-31T09:15:00.000Z"
+    });
+    expect(keywordTarget).toMatchObject({
+      lastRunStatus: "failed",
+      lastResultCount: 0,
+      lastRunAt: "2026-03-31T09:15:00.000Z"
+    });
 
     repository.database.close();
   });
@@ -169,6 +335,7 @@ describe("monitoring sync service", () => {
       categoryId: "claude",
       keywordTarget: {
         id: "target-1",
+        categoryId: "claude",
         keyword: "claude code",
         platformIds: ["xiaohongshu"],
         createdAt: "2026-03-31T09:00:00.000Z",

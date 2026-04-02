@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createMonitoringRepository } from "@/lib/db/monitoring-repository";
-import { upsertAnalysisSnapshot } from "@/lib/db/monitoring-repository";
+import {
+  createMonitoringRepository,
+  getKeywordTargetById,
+  type PersistedKeywordTarget,
+  upsertAnalysisSnapshot
+} from "@/lib/db/monitoring-repository";
 import { buildAnalysisArchiveSnapshot } from "@/lib/history-archive";
 import { refreshKeywordTargetPlatform, type SyncablePlatformId } from "@/lib/monitoring-sync-service";
 import type { ReplicaDailyReport, ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
@@ -37,10 +41,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (platformId !== "wechat" && platformId !== "xiaohongshu") {
+  if (platformId !== "wechat" && platformId !== "xiaohongshu" && platformId !== "twitter") {
     return NextResponse.json(
       {
-        error: "Only wechat and xiaohongshu refresh are supported right now",
+        error: "Only wechat, xiaohongshu, and twitter refresh are supported right now",
         items: []
       },
       { status: 400 }
@@ -50,19 +54,23 @@ export async function POST(request: NextRequest) {
   const repository = createMonitoringRepository();
 
   try {
+    const persistedKeywordTarget = getKeywordTargetById(repository, categoryId, keywordTargetId);
+    const fallbackKeywordTarget: PersistedKeywordTarget = {
+      id: keywordTargetId,
+      categoryId,
+      keyword,
+      platformIds,
+      createdAt: body.createdAt?.trim() || new Date().toISOString(),
+      lastRunAt: body.lastRunAt ?? null,
+      lastRunStatus: body.lastRunStatus ?? "idle",
+      lastResultCount: body.lastResultCount ?? 0
+    };
+    const keywordTarget = persistedKeywordTarget ?? fallbackKeywordTarget;
+
     const snapshot = await refreshKeywordTargetPlatform({
       repository,
       categoryId,
-      keywordTarget: {
-        id: keywordTargetId,
-        categoryId,
-        keyword,
-        platformIds,
-        createdAt: body.createdAt?.trim() || new Date().toISOString(),
-        lastRunAt: body.lastRunAt ?? null,
-        lastRunStatus: body.lastRunStatus ?? "idle",
-        lastResultCount: body.lastResultCount ?? 0
-      },
+      keywordTarget,
       platformId: platformId as SyncablePlatformId
     });
 

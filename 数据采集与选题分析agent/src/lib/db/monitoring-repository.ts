@@ -204,6 +204,54 @@ export function listKeywordTargets(repository: MonitoringRepository, categoryId:
   }));
 }
 
+export function getKeywordTargetById(
+  repository: MonitoringRepository,
+  categoryId: string,
+  id: string
+): PersistedKeywordTarget | undefined {
+  const row = repository.database
+    .prepare(
+      `SELECT
+        id,
+        category_id,
+        keyword,
+        platform_ids,
+        created_at,
+        last_run_at,
+        last_run_status,
+        last_result_count
+      FROM keyword_targets
+      WHERE category_id = ? AND id = ?`
+    )
+    .get(categoryId, id) as
+    | {
+        id: string;
+        category_id: string;
+        keyword: string;
+        platform_ids: string;
+        created_at: string;
+        last_run_at: string | null;
+        last_run_status: SyncRunStatus;
+        last_result_count: number;
+      }
+    | undefined;
+
+  if (!row) {
+    return undefined;
+  }
+
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    keyword: row.keyword,
+    platformIds: JSON.parse(row.platform_ids) as ReplicaTrackedPlatformId[],
+    createdAt: row.created_at,
+    lastRunAt: row.last_run_at,
+    lastRunStatus: row.last_run_status,
+    lastResultCount: row.last_result_count
+  };
+}
+
 export function createSearchQuery(repository: MonitoringRepository, input: PersistedSearchQuery) {
   repository.database
     .prepare(

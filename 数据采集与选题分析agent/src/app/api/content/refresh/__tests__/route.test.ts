@@ -11,6 +11,7 @@ const repository = {
 
 const createMonitoringRepositoryMock = vi.fn(() => repository);
 const upsertAnalysisSnapshotMock = vi.fn();
+const getKeywordTargetByIdMock = vi.fn();
 const buildAnalysisArchiveSnapshotMock = vi.fn(() => ({
   snapshot: {
     id: "query-run-1-analysis",
@@ -29,7 +30,8 @@ const refreshKeywordTargetPlatformMock = vi.fn();
 
 vi.mock("@/lib/db/monitoring-repository", () => ({
   createMonitoringRepository: createMonitoringRepositoryMock,
-  upsertAnalysisSnapshot: upsertAnalysisSnapshotMock
+  upsertAnalysisSnapshot: upsertAnalysisSnapshotMock,
+  getKeywordTargetById: getKeywordTargetByIdMock
 }));
 
 vi.mock("@/lib/history-archive", () => ({
@@ -44,6 +46,7 @@ describe("POST /api/content/refresh", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     repository.database.close.mockReset();
+    getKeywordTargetByIdMock.mockReturnValue(undefined);
     refreshKeywordTargetPlatformMock.mockResolvedValue({
       searchQueryId: "query-run-1",
       items: [],
@@ -114,5 +117,129 @@ describe("POST /api/content/refresh", () => {
       }
     });
     expect(repository.database.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports twitter refresh without changing the response shape", async () => {
+    const { POST } = await import("@/app/api/content/refresh/route");
+
+    const request = new NextRequest("http://localhost/api/content/refresh", {
+      method: "POST",
+      body: JSON.stringify({
+        categoryId: "claude",
+        keywordTargetId: "claude-keyword-twitter",
+        keyword: "claude code",
+        platformId: "twitter",
+        platformIds: ["twitter"]
+      })
+    });
+
+    const response = await POST(request);
+    const payload = await response.json();
+
+    expect(refreshKeywordTargetPlatformMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categoryId: "claude",
+        platformId: "twitter"
+      })
+    );
+    expect(payload).toEqual({
+      items: [],
+      rawItems: [],
+      meta: {
+        source: "twitter",
+        sortedBy: "publish_time_desc",
+        persisted: true,
+        fetchedCount: 2,
+        cappedCount: 2
+      }
+    });
+    expect(repository.database.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the persisted keyword target metadata when refreshing an existing target", async () => {
+    getKeywordTargetByIdMock.mockReturnValue({
+      id: "claude-keyword-1",
+      categoryId: "claude",
+      keyword: "persisted keyword",
+      platformIds: ["wechat", "twitter"],
+      createdAt: "2026-03-30T08:00:00.000Z",
+      lastRunAt: "2026-03-31T08:00:00.000Z",
+      lastRunStatus: "success",
+      lastResultCount: 8
+    });
+
+    const { POST } = await import("@/app/api/content/refresh/route");
+
+    const request = new NextRequest("http://localhost/api/content/refresh", {
+      method: "POST",
+      body: JSON.stringify({
+        categoryId: "claude",
+        keywordTargetId: "claude-keyword-1",
+        keyword: "request keyword",
+        platformId: "twitter",
+        platformIds: ["twitter"],
+        createdAt: "2026-04-01T10:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      })
+    });
+
+    await POST(request);
+
+    expect(refreshKeywordTargetPlatformMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categoryId: "claude",
+        platformId: "twitter",
+        keywordTarget: {
+          id: "claude-keyword-1",
+          categoryId: "claude",
+          keyword: "persisted keyword",
+          platformIds: ["wechat", "twitter"],
+          createdAt: "2026-03-30T08:00:00.000Z",
+          lastRunAt: "2026-03-31T08:00:00.000Z",
+          lastRunStatus: "success",
+          lastResultCount: 8
+        }
+      })
+    );
+  });
+
+  it("creates a keyword target from the request body when no persisted target exists", async () => {
+    getKeywordTargetByIdMock.mockReturnValue(undefined);
+
+    const { POST } = await import("@/app/api/content/refresh/route");
+
+    const request = new NextRequest("http://localhost/api/content/refresh", {
+      method: "POST",
+      body: JSON.stringify({
+        categoryId: "claude",
+        keywordTargetId: "new-keyword-target",
+        keyword: "request keyword",
+        platformId: "twitter",
+        platformIds: ["twitter"],
+        createdAt: "2026-04-01T10:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      })
+    });
+
+    await POST(request);
+
+    expect(refreshKeywordTargetPlatformMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keywordTarget: {
+          id: "new-keyword-target",
+          categoryId: "claude",
+          keyword: "request keyword",
+          platformIds: ["twitter"],
+          createdAt: "2026-04-01T10:00:00.000Z",
+          lastRunAt: null,
+          lastRunStatus: "idle",
+          lastResultCount: 0
+        }
+      })
+    );
   });
 });
