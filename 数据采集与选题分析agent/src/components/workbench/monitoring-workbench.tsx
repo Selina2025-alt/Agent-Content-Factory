@@ -1,349 +1,1328 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { ActionDeck } from "@/components/workbench/action-deck";
-import { CategorySidebar } from "@/components/workbench/category-sidebar";
-import { ContentTab } from "@/components/workbench/content-tab";
-import { GlobalToolbar } from "@/components/workbench/global-toolbar";
-import { MonitorSummaryBar } from "@/components/workbench/monitor-summary-bar";
-import { ReportTab } from "@/components/workbench/report-tab";
-import { RightRail } from "@/components/workbench/right-rail";
-import { SettingsTab } from "@/components/workbench/settings-tab";
-import { WorkbenchHeader } from "@/components/workbench/workbench-header";
-import { monitorCategories } from "@/lib/mock-data";
+import { ReplicaAnalysisPanel } from "@/components/workbench/replica-analysis-panel";
+import { ReplicaContentList } from "@/components/workbench/replica-content-list";
+import { ReplicaDateRow } from "@/components/workbench/replica-date-row";
 import {
-  buildInitialWorkbenchState,
-  getActiveCategory,
-  getCurrentDailyReport,
-  getLinkedContentIds,
-  getTimelineContent,
-  getTopLinkedContent,
-  getTopicById
-} from "@/lib/workbench-selectors";
-import type {
-  ActionItem,
-  ContentItem,
-  ContentFocusMode,
-  DailyReport,
-  TabId,
-  TopicIdea,
-  WorkbenchState
-} from "@/lib/types";
+  ReplicaHistoryPage,
+  type ReplicaHistoryDetail,
+  type ReplicaHistoryQuery
+} from "@/components/workbench/replica-history-page";
+import { ReplicaKeywordBar } from "@/components/workbench/replica-keyword-bar";
+import { ReplicaPlatformRow } from "@/components/workbench/replica-platform-row";
+import { ReplicaSettingsPanel } from "@/components/workbench/replica-settings-panel";
+import { ReplicaSidebar } from "@/components/workbench/replica-sidebar";
+import { ReplicaTopbar } from "@/components/workbench/replica-topbar";
+import {
+  initialReplicaCategories,
+  replicaPlatforms,
+  type ReplicaAnalysisMode,
+  type ReplicaArticle,
+  type ReplicaCategory,
+  type ReplicaKeywordTarget,
+  type ReplicaPlatformId,
+  type ReplicaTrackedPlatformId,
+  type ReplicaTabId
+} from "@/lib/replica-workbench-data";
+import {
+  addCreatorToCategory,
+  addKeywordTargetToCategory,
+  buildDateOptions,
+  buildReplicaArticles,
+  createReplicaCategory,
+  filterReplicaArticles,
+  getDefaultDateId,
+  mapContentItemsToReplicaArticles,
+  mergeKeywordTargetsIntoCategory,
+  normalizeCategoryInput,
+  removeCreatorFromCategory,
+  removeKeywordFromCategory,
+  removeReplicaCategory,
+  renameReplicaCategory
+} from "@/lib/replica-workbench";
+import {
+  loadSearchHistory,
+  saveSearchHistoryEntry,
+  type SearchHistoryEntry
+} from "@/lib/search-history";
+import type { ContentItem } from "@/lib/types";
 
-export function buildWorkbenchStateForCategory(
-  categories: typeof monitorCategories,
+interface ContentResponseMeta {
+  source: string;
+  sortedBy: string;
+  persisted?: boolean;
+  fetchedCount?: number;
+  cappedCount?: number;
+}
+
+interface ContentResponsePayload {
+  error?: string;
+  items?: ContentItem[];
+  rawItems?: ContentItem[];
+  meta?: ContentResponseMeta | null;
+}
+
+interface KeywordTargetsResponsePayload {
+  error?: string;
+  keywordTargets?: ReplicaKeywordTarget[];
+}
+
+interface HistoryListResponsePayload {
+  error?: string;
+  queries?: ReplicaHistoryQuery[];
+}
+
+interface HistoryDetailResponsePayload {
+  error?: string;
+  query?: ReplicaHistoryQuery;
+  analysis?: ReplicaHistoryDetail["analysis"];
+  items?: ContentItem[];
+}
+
+interface ContentState {
+  status: "idle" | "loading" | "success" | "error";
+  keyword: string;
+  keywordTargetId: string;
+  platformId: ReplicaPlatformId;
+  items: ReplicaArticle[];
+  rawItems: ReplicaArticle[];
+  error: string;
+  meta: ContentResponseMeta | null;
+}
+
+interface CategoryMenuState {
+  categoryId: string;
+  x: number;
+  y: number;
+}
+
+function debugContentFlow(label: string, payload: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  console.debug(`[ContentPulse] ${label}`, payload);
+}
+
+function updateCategory(
+  categories: ReplicaCategory[],
   categoryId: string,
-  activeTab: TabId
-): WorkbenchState {
-  const activeCategory = getActiveCategory(categories, categoryId);
-  const categoryState = buildInitialWorkbenchState([activeCategory]);
+  updater: (category: ReplicaCategory) => ReplicaCategory
+) {
+  return categories.map((category) => (category.id === categoryId ? updater(category) : category));
+}
 
+function buildContentStateKey(
+  categoryId: string,
+  keywordTargetId: string,
+  platformId: ReplicaPlatformId
+) {
+  return `${categoryId}:${keywordTargetId}:${platformId}`;
+}
+
+function buildContentState(
+  keywordTargetId: string,
+  platformId: ReplicaPlatformId,
+  keyword: string,
+  current?: ContentState
+): ContentState {
   return {
-    ...categoryState,
-    selectedCategoryId: activeCategory.id,
-    activeTab
+    status: current?.status ?? "idle",
+    keyword,
+    keywordTargetId,
+    platformId,
+    items: current?.items ?? [],
+    rawItems: current?.rawItems ?? [],
+    error: current?.error ?? "",
+    meta: current?.meta ?? null
   };
 }
 
+function isCollectablePlatform(
+  platformId: ReplicaTrackedPlatformId
+): platformId is "wechat" | "xiaohongshu" {
+  return platformId === "wechat" || platformId === "xiaohongshu";
+}
+
+function sortRawReplicaArticles(rawItems: ReplicaArticle[]) {
+  return [...rawItems].sort((left, right) => (left.rawOrderIndex ?? 0) - (right.rawOrderIndex ?? 0));
+}
+
+function getEnabledCollectablePlatforms(category: ReplicaCategory) {
+  const enabledPlatformIds = category.platforms
+    .filter((platform) => platform.enabled)
+    .map((platform) => platform.id);
+
+  return enabledPlatformIds.filter(isCollectablePlatform);
+}
+
+function findKeywordTargetByKeyword(category: ReplicaCategory, keyword: string) {
+  const normalized = normalizeCategoryInput(keyword).toLowerCase();
+  return category.keywordTargets.find((item) => item.keyword === normalized);
+}
+
+function parseQueryPlatformScope(platformScope: string): ReplicaTrackedPlatformId[] {
+  const trackedPlatforms = new Set(replicaPlatforms.filter((item) => item.id !== "all").map((item) => item.id));
+
+  return platformScope
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is ReplicaTrackedPlatformId => trackedPlatforms.has(part as ReplicaTrackedPlatformId));
+}
+
+function createHistoryQueryFallbackEntries(entries: SearchHistoryEntry[]): ReplicaHistoryQuery[] {
+  return entries.map((entry) => ({
+    id: entry.id,
+    categoryId: entry.categoryId,
+    keywordTargetId: null,
+    keyword: entry.keyword,
+    platformScope: "wechat",
+    triggerType: "manual_refresh",
+    status: "success",
+    fetchedCount: 0,
+    cappedCount: 0,
+    startedAt: entry.searchedAt,
+    finishedAt: entry.searchedAt,
+    errorMessage: null
+  }));
+}
+
+function buildArchivedReports(detail: NonNullable<ReplicaHistoryDetail["analysis"]>): ReplicaCategory["reports"] {
+  return [
+    {
+      id: detail.snapshot.id,
+      date: detail.snapshot.generatedAt.slice(0, 10),
+      label: detail.snapshot.generatedAt.slice(0, 10),
+      hotSummary: detail.snapshot.hotSummary,
+      focusSummary: detail.snapshot.focusSummary,
+      patternSummary: detail.snapshot.patternSummary,
+      insightSummary: detail.snapshot.insightSummary,
+      suggestions: detail.topics.map((topic) => ({
+        id: topic.id,
+        title: topic.title,
+        intro: topic.intro,
+        whyNow: topic.whyNow,
+        hook: topic.hook,
+        growth: topic.growth,
+        supportContentIds: topic.supportContentIds
+      }))
+    }
+  ];
+}
+
 export function MonitoringWorkbench() {
-  const [workbenchState, setWorkbenchState] = useState<WorkbenchState>(() =>
-    buildInitialWorkbenchState(monitorCategories)
+  const [categories, setCategories] = useState(initialReplicaCategories);
+  const [activeCategoryId, setActiveCategoryId] = useState(initialReplicaCategories[0]?.id ?? "claude");
+  const [activeTab, setActiveTab] = useState<ReplicaTabId>("content");
+  const [analysisMode, setAnalysisMode] = useState<ReplicaAnalysisMode>("daily");
+  const [reportWindow, setReportWindow] = useState<7 | 14>(7);
+  const [activePlatformId, setActivePlatformId] = useState<ReplicaPlatformId>("wechat");
+  const [activeDateId, setActiveDateId] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState("");
+  const [selectedReportId, setSelectedReportId] = useState("");
+  const [activeKeywordTargetId, setActiveKeywordTargetId] = useState(
+    initialReplicaCategories[0]?.keywordTargets[0]?.id ?? ""
   );
-  const [settingsDraftTarget, setSettingsDraftTarget] = useState<
-    "keyword" | "account" | null
-  >(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
+  const [keywordDraft, setKeywordDraft] = useState(initialReplicaCategories[0]?.keyword ?? "");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createDraft, setCreateDraft] = useState("");
+  const [menuState, setMenuState] = useState<CategoryMenuState | null>(null);
+  const [renamingCategoryId, setRenamingCategoryId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [historyEntries, setHistoryEntries] = useState<SearchHistoryEntry[]>([]);
+  const [historyQueries, setHistoryQueries] = useState<ReplicaHistoryQuery[]>([]);
+  const [selectedHistoryQueryId, setSelectedHistoryQueryId] = useState<string | null>(null);
+  const [historyDetail, setHistoryDetail] = useState<ReplicaHistoryDetail | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState("");
+  const [historyPlatformFilter, setHistoryPlatformFilter] = useState<ReplicaPlatformId>("all");
+  const [historyKeywordFilter, setHistoryKeywordFilter] = useState("");
+  const [contentStates, setContentStates] = useState<Record<string, ContentState>>({});
+  const [archivedReports, setArchivedReports] = useState<ReplicaCategory["reports"] | null>(null);
 
-  if (monitorCategories.length === 0) {
-    return (
-      <section className="workbench-shell">
-        <div className="workbench-shell__grid">
-          <main className="workbench-shell__panel workbench-shell__panel--main">
-            <div className="workbench-shell__hero-card">
-              <div className="workbench-shell__panel-kicker">浠婃棩寤鸿鍔ㄤ綔姹?</div>
-              <h2>鏆傛棤鐩戞帶鍒嗙被</h2>
-              <p>璇峰厛娣诲姞涓€涓洃鎺у垎绫诲悗鍐嶆煡鐪嬪伐浣滃彴銆?</p>
-            </div>
-          </main>
-        </div>
-      </section>
-    );
-  }
+  const activeCategory =
+    categories.find((item) => item.id === activeCategoryId) ?? categories[0] ?? initialReplicaCategories[0];
 
-  const activeCategory = getActiveCategory(
-    monitorCategories,
-    workbenchState.selectedCategoryId
+  const activeKeywordTarget =
+    activeCategory.keywordTargets.find((item) => item.id === activeKeywordTargetId) ??
+    findKeywordTargetByKeyword(activeCategory, keywordDraft) ??
+    activeCategory.keywordTargets[0];
+  const activeKeywordTargetKeyword = activeKeywordTarget?.keyword ?? "";
+  const analysisReports = archivedReports ?? activeCategory.reports;
+
+  const activeKeyword = activeKeywordTarget?.keyword ?? normalizeCategoryInput(keywordDraft).toLowerCase();
+  const currentStateKey = buildContentStateKey(
+    activeCategory.id,
+    activeKeywordTarget?.id ?? "draft",
+    activePlatformId
   );
-  const activeReport = getCurrentDailyReport(
+  const currentContentState = contentStates[currentStateKey];
+
+  const mockArticles = useMemo(
+    () => buildReplicaArticles(activeCategory, activeKeyword || activeCategory.keyword),
+    [activeCategory, activeKeyword]
+  );
+
+  const hasPersistedRun = Boolean(activeKeywordTarget?.lastRunAt);
+  const currentArticles = useMemo(
+    () =>
+      currentContentState
+        ? currentContentState.items
+        : hasPersistedRun
+          ? []
+          : mockArticles,
+    [currentContentState, hasPersistedRun, mockArticles]
+  );
+
+  const dateOptions = useMemo(() => buildDateOptions(currentArticles), [currentArticles]);
+  const visibleArticles = useMemo(
+    () => filterReplicaArticles(currentArticles, activePlatformId, activeDateId),
+    [activeDateId, activePlatformId, currentArticles]
+  );
+  const displayedCount = visibleArticles.length;
+  const sidebarCategories = useMemo(
+    () =>
+      categories.map((category) =>
+        category.id === activeCategory.id ? { ...category, count: displayedCount } : category
+      ),
+    [activeCategory.id, categories, displayedCount]
+  );
+  const platformCounts = useMemo(
+    () =>
+      replicaPlatforms.reduce<Record<string, number>>((result, platform) => {
+        if (platform.id === "all") {
+          result[platform.id] = currentArticles.length;
+          return result;
+        }
+
+        result[platform.id] = currentArticles.filter((item) => item.platformId === platform.id).length;
+        return result;
+      }, {}),
+    [currentArticles]
+  );
+  const filteredHistoryQueries = useMemo(() => {
+    const normalizedKeyword = historyKeywordFilter.trim().toLowerCase();
+
+    return historyQueries.filter((query) => {
+      const matchesKeyword =
+        !normalizedKeyword || query.keyword.toLowerCase().includes(normalizedKeyword);
+      const queryPlatforms = parseQueryPlatformScope(query.platformScope);
+      const matchesPlatform =
+        historyPlatformFilter === "all" ||
+        queryPlatforms.includes(historyPlatformFilter as ReplicaTrackedPlatformId);
+
+      return matchesKeyword && matchesPlatform;
+    });
+  }, [historyKeywordFilter, historyPlatformFilter, historyQueries]);
+
+  useEffect(() => {
+    setHistoryEntries(loadSearchHistory());
+  }, []);
+
+  useEffect(() => {
+    if (!analysisReports.some((item) => item.id === selectedReportId)) {
+      setSelectedReportId(analysisReports[0]?.id ?? "");
+    }
+
+    if (!activeCategory.keywordTargets.some((item) => item.id === activeKeywordTargetId)) {
+      setActiveKeywordTargetId(activeCategory.keywordTargets[0]?.id ?? "");
+    }
+  }, [
+    activeCategory.id,
+    analysisReports,
+    activeCategory.keywordTargets,
+    selectedReportId,
+    activeKeywordTargetId
+  ]);
+
+  useEffect(() => {
+    if (activeKeywordTargetKeyword) {
+      setKeywordDraft(activeKeywordTargetKeyword);
+    }
+  }, [activeKeywordTargetId, activeKeywordTargetKeyword]);
+
+  useEffect(() => {
+    const nextDateId = getDefaultDateId(currentArticles) ?? "";
+
+    if (!activeDateId || !dateOptions.some((item) => item.id === activeDateId)) {
+      setActiveDateId(nextDateId);
+    }
+  }, [activeDateId, currentArticles, dateOptions]);
+
+  useEffect(() => {
+    if (!selectedCardId || !visibleArticles.some((item) => item.id === selectedCardId)) {
+      setSelectedCardId(visibleArticles[0]?.id ?? "");
+    }
+  }, [selectedCardId, visibleArticles]);
+
+  useEffect(() => {
+    debugContentFlow("render-state", {
+      activeKeyword,
+      activePlatform: activePlatformId,
+      fetchedCount: currentContentState?.meta?.fetchedCount ?? currentArticles.length,
+      cappedCount: currentContentState?.meta?.cappedCount ?? currentArticles.length,
+      renderedCount: displayedCount,
+      platformCounts,
+      renderedPlatforms: Array.from(new Set(visibleArticles.map((item) => item.platformId)))
+    });
+  }, [
+    activeKeyword,
+    activePlatformId,
+    currentArticles.length,
+    currentContentState?.meta?.cappedCount,
+    currentContentState?.meta?.fetchedCount,
+    displayedCount,
+    platformCounts,
+    visibleArticles
+  ]);
+
+  useEffect(() => {
+    function handleWindowClick() {
+      setMenuState(null);
+    }
+
+    window.addEventListener("click", handleWindowClick);
+
+    return () => {
+      window.removeEventListener("click", handleWindowClick);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      return;
+    }
+
+    if (selectedHistoryQueryId || historyDetail) {
+      setSelectedHistoryQueryId(null);
+      setHistoryDetail(null);
+    }
+  }, [activeTab, historyDetail, selectedHistoryQueryId]);
+
+  useEffect(() => {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadKeywordTargetsFromPersistence() {
+      try {
+        const response = await fetch(`/api/keyword-targets?categoryId=${activeCategory.id}`);
+        const payload = (await response.json()) as KeywordTargetsResponsePayload;
+
+        if (!response.ok || cancelled || !payload.keywordTargets) {
+          return;
+        }
+
+        setCategories((current) =>
+          updateCategory(current, activeCategory.id, (category) =>
+            mergeKeywordTargetsIntoCategory(category, payload.keywordTargets ?? [])
+          )
+        );
+      } catch {
+        // Keep local mock state when persistence is unavailable.
+      }
+    }
+
+    void loadKeywordTargetsFromPersistence();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory.id]);
+
+  useEffect(() => {
+    if (!activeKeywordTarget?.lastRunAt) {
+      return;
+    }
+
+    if (contentStates[currentStateKey]) {
+      return;
+    }
+
+    void loadStoredContent(activeCategory, activeKeywordTarget, activePlatformId);
+  }, [
     activeCategory,
-    workbenchState.selectedReportDate
-  );
+    activeKeywordTarget,
+    activePlatformId,
+    currentStateKey,
+    contentStates
+  ]);
 
-  function openTopicBridge(
-    topic: TopicIdea,
-    report: DailyReport,
-    focusMode: Exclude<ContentFocusMode, null>
+  useEffect(() => {
+    if (activeTab !== "history") {
+      return;
+    }
+
+    void loadHistoryQueries(activeCategory.id);
+  // loadHistoryQueries intentionally closes over the latest fallback history state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory.id, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "history") {
+      return;
+    }
+
+    if (filteredHistoryQueries.length === 0) {
+      setSelectedHistoryQueryId(null);
+      setHistoryDetail(null);
+      return;
+    }
+
+    if (!selectedHistoryQueryId) {
+      return;
+    }
+
+    if (!filteredHistoryQueries.some((entry) => entry.id === selectedHistoryQueryId)) {
+      setSelectedHistoryQueryId(null);
+      setHistoryDetail(null);
+    }
+  }, [activeTab, filteredHistoryQueries, selectedHistoryQueryId]);
+
+  function patchKeywordTargetState(
+    categoryId: string,
+    keywordTargetId: string,
+    updater: (target: ReplicaKeywordTarget) => ReplicaKeywordTarget
   ) {
-    const highlightedContent =
-      focusMode === "samples"
-        ? getTopLinkedContent(activeCategory, topic)
-        : focusMode === "timeline"
-          ? getTimelineContent(activeCategory, topic)
-          : activeCategory.content.filter((content) =>
-              getLinkedContentIds(topic).includes(content.id)
-            );
-    const highlightedContentIds = highlightedContent.map((content) => content.id);
-    const selectedContentDate = highlightedContent[0]?.date ?? report.date;
-
-    setWorkbenchState((current) => ({
-      ...current,
-      activeTab: "content",
-      selectedReportDate: report.date,
-      selectedContentDate,
-      selectedPlatformId: "all",
-      selectedContentRange: focusMode === "timeline" ? "7d" : "3d",
-      contentPoolView: focusMode === "samples" ? "hot" : "all",
-      contentFocusMode: focusMode,
-      focusedTopicId: topic.id,
-      highlightedContentIds
-    }));
-  }
-
-  function handleOpenEvidence(topic: TopicIdea, report: DailyReport) {
-    openTopicBridge(topic, report, "evidence");
-  }
-
-  function handleOpenSamples(topic: TopicIdea, report: DailyReport) {
-    openTopicBridge(topic, report, "samples");
-  }
-
-  function handleOpenTimeline(topic: TopicIdea, report: DailyReport) {
-    openTopicBridge(topic, report, "timeline");
-  }
-
-  function handleActionViewEvidence(actionItem: ActionItem) {
-    const linkedTopic = actionItem.linkedTopicIds
-      .map((topicId) => getTopicById(activeCategory, topicId))
-      .find(Boolean);
-
-    if (!linkedTopic) {
-      return;
-    }
-
-    const linkedReport = activeCategory.reports.find((report) =>
-      report.topics.some((topic) => topic.id === linkedTopic.id)
+    setCategories((current) =>
+      updateCategory(current, categoryId, (category) => ({
+        ...category,
+        keywordTargets: category.keywordTargets.map((target) =>
+          target.id === keywordTargetId ? updater(target) : target
+        )
+      }))
     );
+  }
 
-    if (!linkedReport) {
+  async function loadStoredContent(
+    category: ReplicaCategory,
+    keywordTarget: ReplicaKeywordTarget,
+    platformId: ReplicaPlatformId,
+    options?: { quiet?: boolean }
+  ) {
+    if (typeof fetch !== "function") {
       return;
     }
 
-    handleOpenEvidence(linkedTopic, linkedReport);
+    const key = buildContentStateKey(category.id, keywordTarget.id, platformId);
+
+    if (!options?.quiet) {
+      setContentStates((current) => ({
+        ...current,
+        [key]: {
+          ...buildContentState(keywordTarget.id, platformId, keywordTarget.keyword, current[key]),
+          status: "loading",
+          error: ""
+        }
+      }));
+    }
+
+    try {
+      const params = new URLSearchParams({
+        categoryId: category.id,
+        keywordTargetId: keywordTarget.id
+      });
+
+      if (platformId !== "all") {
+        params.set("platformId", platformId);
+      }
+
+      const response = await fetch(`/api/content/list?${params.toString()}`);
+      const payload = (await response.json()) as ContentResponsePayload;
+
+      if (!response.ok) {
+        throw new Error(payload.error || "内容读取失败");
+      }
+
+      const items = mapContentItemsToReplicaArticles(payload.items ?? [], keywordTarget.keyword);
+
+      setContentStates((current) => ({
+        ...current,
+        [key]: {
+          status: "success",
+          keyword: keywordTarget.keyword,
+          keywordTargetId: keywordTarget.id,
+          platformId,
+          items,
+          rawItems: [],
+          error: "",
+          meta: payload.meta ?? null
+        }
+      }));
+
+      debugContentFlow("stored-content-loaded", {
+        activeKeyword: keywordTarget.keyword,
+        activePlatform: platformId,
+        fetchedCount: payload.meta?.fetchedCount ?? items.length,
+        cappedCount: payload.meta?.cappedCount ?? items.length,
+        renderedCount: items.length
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "内容读取失败";
+
+      setContentStates((current) => ({
+        ...current,
+        [key]: {
+          ...buildContentState(keywordTarget.id, platformId, keywordTarget.keyword, current[key]),
+          status: "error",
+          error: message
+        }
+      }));
+
+      debugContentFlow("stored-content-load-failed", {
+        activeKeyword: keywordTarget.keyword,
+        activePlatform: platformId,
+        error: message
+      });
+    }
   }
 
-  function handleActionAddToPool(actionItem: ActionItem) {
-    const linkedContentIds = actionItem.linkedTopicIds.flatMap((topicId) => {
-      const topic = getTopicById(activeCategory, topicId);
-      return topic ? getLinkedContentIds(topic) : [];
+  async function loadHistoryQueries(_categoryId: string) {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    setHistoryLoading(true);
+    setHistoryErrorMessage("");
+
+    try {
+      const response = await fetch("/api/history");
+      const payload = (await response.json()) as HistoryListResponsePayload;
+
+      if (!response.ok) {
+        throw new Error(payload.error || "History load failed");
+      }
+
+      const queries = payload.queries ?? [];
+
+      setHistoryQueries(queries);
+
+      if (queries.length === 0) {
+        setSelectedHistoryQueryId(null);
+        setHistoryDetail(null);
+        return;
+      }
+
+      if (selectedHistoryQueryId && queries.some((entry) => entry.id === selectedHistoryQueryId)) {
+        await loadHistoryDetail(selectedHistoryQueryId);
+      } else {
+        setSelectedHistoryQueryId(null);
+        setHistoryDetail(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "History load failed";
+      const fallbackQueries = createHistoryQueryFallbackEntries(historyEntries);
+
+      setHistoryQueries(fallbackQueries);
+      setHistoryErrorMessage(fallbackQueries.length > 0 ? "" : message);
+      setSelectedHistoryQueryId(null);
+      setHistoryDetail(null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function loadHistoryDetail(queryId: string) {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    setHistoryDetailLoading(true);
+    setHistoryErrorMessage("");
+
+    try {
+      const response = await fetch(`/api/history/${queryId}`);
+      const payload = (await response.json()) as HistoryDetailResponsePayload;
+
+      if (!response.ok || !payload.query) {
+        throw new Error(payload.error || "历史详情读取失败");
+      }
+
+      setHistoryDetail({
+        query: payload.query,
+        analysis: payload.analysis ?? null,
+        items: payload.items ?? []
+      });
+      setSelectedHistoryQueryId(queryId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "历史详情读取失败";
+      setHistoryErrorMessage(message);
+      setHistoryDetail(null);
+    } finally {
+      setHistoryDetailLoading(false);
+    }
+  }
+
+  function ensureHistoryKeywordTarget(category: ReplicaCategory, query: ReplicaHistoryQuery) {
+    const existingTarget =
+      category.keywordTargets.find((entry) => entry.id === query.keywordTargetId) ??
+      findKeywordTargetByKeyword(category, query.keyword);
+
+    if (existingTarget) {
+      return { nextCategory: category, keywordTarget: existingTarget };
+    }
+
+    const platformIds = parseQueryPlatformScope(query.platformScope);
+    const nextCategory = addKeywordTargetToCategory(category, {
+      keyword: query.keyword,
+      platformIds: platformIds.length > 0 ? platformIds : ["wechat"]
+    });
+    const nextTarget = findKeywordTargetByKeyword(nextCategory, query.keyword) ?? nextCategory.keywordTargets[0]!;
+
+    return { nextCategory, keywordTarget: nextTarget };
+  }
+
+  function applyHistoricalContent(detail: ReplicaHistoryDetail) {
+    const targetCategory =
+      categories.find((category) => category.id === detail.query.categoryId) ?? activeCategory;
+    const { nextCategory, keywordTarget } = ensureHistoryKeywordTarget(targetCategory, detail.query);
+    const nextPlatformIds = parseQueryPlatformScope(detail.query.platformScope);
+    const nextPlatformId =
+      nextPlatformIds.length > 1
+        ? "all"
+        : (nextPlatformIds[0] as ReplicaPlatformId | undefined) ?? "wechat";
+    const items = mapContentItemsToReplicaArticles(detail.items, detail.query.keyword);
+    const stateKey = buildContentStateKey(nextCategory.id, keywordTarget.id, nextPlatformId);
+
+    if (nextCategory !== targetCategory) {
+      setCategories((current) => updateCategory(current, targetCategory.id, () => nextCategory));
+    }
+
+    setContentStates((current) => ({
+      ...current,
+      [stateKey]: {
+        status: "success",
+        keyword: detail.query.keyword,
+        keywordTargetId: keywordTarget.id,
+        platformId: nextPlatformId,
+        items,
+        rawItems: [],
+        error: "",
+        meta: {
+          source: "history",
+          sortedBy: "publish_time_desc",
+          persisted: true,
+          fetchedCount: detail.query.fetchedCount,
+          cappedCount: detail.query.cappedCount
+        }
+      }
+    }));
+
+    setActiveCategoryId(nextCategory.id);
+    setActiveKeywordTargetId(keywordTarget.id);
+    setKeywordDraft(detail.query.keyword);
+    setActivePlatformId(nextPlatformId);
+    setActiveDateId("");
+    setSelectedCardId("");
+    setActiveTab("content");
+    setArchivedReports(null);
+    setStatusMessage(`已恢复 ${detail.query.keyword} 的历史内容快照。`);
+  }
+
+  function applyHistoricalAnalysis(detail: ReplicaHistoryDetail) {
+    if (!detail.analysis) {
+      setStatusMessage("当前历史记录还没有选题快照。");
+      return;
+    }
+
+    setArchivedReports(buildArchivedReports(detail.analysis));
+    setSelectedReportId(detail.analysis.snapshot.id);
+    setActiveTab("analysis");
+    setStatusMessage(`已恢复 ${detail.query.keyword} 的历史选题快照。`);
+  }
+
+  async function refreshKeywordTarget(
+    category: ReplicaCategory,
+    keywordTarget: ReplicaKeywordTarget,
+    requestedPlatformId: ReplicaPlatformId,
+    options?: { saveHistory?: boolean; refreshPlatforms?: ReplicaTrackedPlatformId[] }
+  ) {
+    if (typeof fetch !== "function") {
+      setStatusMessage("当前环境无法发起更新，请在浏览器中重试。");
+      return;
+    }
+
+    const enabledCollectablePlatforms = getEnabledCollectablePlatforms(category);
+    const refreshPlatforms =
+      options?.refreshPlatforms ??
+      (requestedPlatformId === "all"
+        ? keywordTarget.platformIds.filter(
+            (platformId) =>
+              isCollectablePlatform(platformId) &&
+              enabledCollectablePlatforms.includes(platformId)
+          )
+        : keywordTarget.platformIds.filter(
+            (platformId) =>
+              isCollectablePlatform(platformId) &&
+              platformId === requestedPlatformId &&
+              enabledCollectablePlatforms.includes(platformId)
+          ));
+
+    if (refreshPlatforms.length === 0) {
+      setStatusMessage("当前关键词没有可更新的平台，请先在监控设置里启用公众号或小红书。");
+      return;
+    }
+
+    debugContentFlow("refresh-start", {
+      activeKeyword: keywordTarget.keyword,
+      activePlatform: requestedPlatformId,
+      refreshPlatforms
     });
 
-    setWorkbenchState((current) => ({
-      ...current,
-      pooledContentIds: [...new Set([...current.pooledContentIds, ...linkedContentIds])]
+    setIsUpdating(true);
+    setStatusMessage("");
+
+    patchKeywordTargetState(category.id, keywordTarget.id, (target) => ({
+      ...target,
+      lastRunStatus: "running"
     }));
+
+    let lastError = "";
+    let failedPlatformId: ReplicaTrackedPlatformId | null = null;
+
+    try {
+      for (const platformId of refreshPlatforms) {
+        failedPlatformId = platformId;
+        const stateKey = buildContentStateKey(category.id, keywordTarget.id, platformId);
+
+        setContentStates((current) => ({
+          ...current,
+          [stateKey]: {
+            ...buildContentState(keywordTarget.id, platformId, keywordTarget.keyword, current[stateKey]),
+            status: "loading",
+            error: ""
+          }
+        }));
+
+        const response = await fetch("/api/content/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            categoryId: category.id,
+            keywordTargetId: keywordTarget.id,
+            keyword: keywordTarget.keyword,
+            platformId,
+            platformIds: keywordTarget.platformIds,
+            createdAt: keywordTarget.createdAt,
+            lastRunAt: keywordTarget.lastRunAt,
+            lastRunStatus: keywordTarget.lastRunStatus,
+            lastResultCount: keywordTarget.lastResultCount,
+            reports: category.reports
+          })
+        });
+        const payload = (await response.json()) as ContentResponsePayload;
+
+        if (!response.ok) {
+          throw new Error(payload.error || "内容更新失败");
+        }
+
+        const items = mapContentItemsToReplicaArticles(payload.items ?? [], keywordTarget.keyword);
+        const rawItems = sortRawReplicaArticles(
+          mapContentItemsToReplicaArticles(payload.rawItems ?? [], keywordTarget.keyword)
+        );
+        const finishedAt = new Date().toISOString();
+
+        setContentStates((current) => ({
+          ...current,
+          [stateKey]: {
+            status: "success",
+            keyword: keywordTarget.keyword,
+            keywordTargetId: keywordTarget.id,
+            platformId,
+            items,
+            rawItems,
+            error: "",
+            meta: payload.meta ?? null
+          }
+        }));
+
+        debugContentFlow("refresh-success", {
+          activeKeyword: keywordTarget.keyword,
+          activePlatform: platformId,
+          fetchedCount: payload.meta?.fetchedCount ?? items.length,
+          cappedCount: payload.meta?.cappedCount ?? items.length,
+          renderedCount: items.length,
+          sourcePlatforms: Array.from(new Set(items.map((item) => item.platformId)))
+        });
+
+        patchKeywordTargetState(category.id, keywordTarget.id, (target) => ({
+          ...target,
+          lastRunAt: finishedAt,
+          lastRunStatus: "success",
+          lastResultCount: items.length
+        }));
+        setArchivedReports(null);
+      }
+
+      if (requestedPlatformId === "all" || refreshPlatforms.length > 1) {
+        await loadStoredContent(category, keywordTarget, "all", { quiet: true });
+      }
+
+      if (options?.saveHistory !== false) {
+        setHistoryEntries(
+          saveSearchHistoryEntry({
+            keyword: keywordTarget.keyword,
+            categoryId: category.id,
+            categoryName: category.name
+          })
+        );
+      }
+
+      setStatusMessage(`已更新 ${keywordTarget.keyword} 的 ${refreshPlatforms.join(" / ")} 内容。`);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "内容更新失败";
+
+      patchKeywordTargetState(category.id, keywordTarget.id, (target) => ({
+        ...target,
+        lastRunAt: new Date().toISOString(),
+        lastRunStatus: "failed"
+      }));
+
+      const failedPlatform = failedPlatformId ?? refreshPlatforms[0] ?? requestedPlatformId;
+      const failedKey = buildContentStateKey(category.id, keywordTarget.id, failedPlatform);
+
+      setContentStates((current) => ({
+        ...current,
+        [failedKey]: {
+          ...buildContentState(keywordTarget.id, failedPlatform, keywordTarget.keyword, current[failedKey]),
+          status: "error",
+          error: lastError
+        }
+      }));
+
+      debugContentFlow("refresh-failed", {
+        activeKeyword: keywordTarget.keyword,
+        activePlatform: failedPlatform,
+        error: lastError
+      });
+    } finally {
+      setIsUpdating(false);
+      if (lastError) {
+        setStatusMessage("");
+      }
+    }
   }
 
-  function handleTogglePending(actionItem: ActionItem) {
-    setWorkbenchState((current) => ({
-      ...current,
-      pendingActionIds: current.pendingActionIds.includes(actionItem.id)
-        ? current.pendingActionIds.filter((id) => id !== actionItem.id)
-        : [...current.pendingActionIds, actionItem.id]
-    }));
+  function handleSelectCategory(categoryId: string) {
+    const nextCategory = categories.find((item) => item.id === categoryId);
+
+    if (!nextCategory) {
+      return;
+    }
+
+    setActiveCategoryId(categoryId);
+    setActiveTab("content");
+    setActivePlatformId("wechat");
+    setAnalysisMode("daily");
+    setMenuState(null);
+    setArchivedReports(null);
+    setSelectedHistoryQueryId(null);
+    setHistoryDetail(null);
+    setHistoryPlatformFilter("all");
+    setHistoryKeywordFilter("");
   }
 
-  function handleOpenLinkedInsight(content: ContentItem) {
-    const linkedTopicId = content.linkedTopicIds.find((topicId) =>
-      activeCategory.reports.some((report) =>
-        report.topics.some((topic) => topic.id === topicId)
+  function handleCreateCategory() {
+    const normalized = normalizeCategoryInput(createDraft);
+
+    if (!normalized) {
+      return;
+    }
+
+    const baseCategory = createReplicaCategory(normalized);
+    const duplicateCount = categories.filter((item) => item.id === baseCategory.id).length;
+    const nextCategory =
+      duplicateCount > 0
+        ? { ...baseCategory, id: `${baseCategory.id}-${duplicateCount + 1}` }
+        : baseCategory;
+
+    setCategories((current) => [...current, nextCategory]);
+    setActiveCategoryId(nextCategory.id);
+    setActiveKeywordTargetId(nextCategory.keywordTargets[0]?.id ?? "");
+    setActiveTab("content");
+    setActivePlatformId("wechat");
+    setShowCreateForm(false);
+    setCreateDraft("");
+    setKeywordDraft(nextCategory.keywordTargets[0]?.keyword ?? nextCategory.keyword);
+    setArchivedReports(null);
+
+    const firstKeywordTarget = nextCategory.keywordTargets[0];
+
+    if (firstKeywordTarget) {
+      void refreshKeywordTarget(nextCategory, firstKeywordTarget, "wechat", {
+        saveHistory: false,
+        refreshPlatforms: ["wechat"]
+      });
+    }
+  }
+
+  function handleDeleteCategory(categoryId: string) {
+    if (categories.length <= 1) {
+      setMenuState(null);
+      return;
+    }
+
+    const nextCategories = removeReplicaCategory(categories, categoryId);
+
+    setCategories(nextCategories);
+    setMenuState(null);
+    setRenamingCategoryId(null);
+    setContentStates((current) => {
+      const next = { ...current };
+
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith(`${categoryId}:`)) {
+          delete next[key];
+        }
+      });
+
+      return next;
+    });
+
+    if (activeCategoryId === categoryId) {
+      const nextActive = nextCategories[0];
+
+      if (nextActive) {
+        setActiveCategoryId(nextActive.id);
+        setActiveKeywordTargetId(nextActive.keywordTargets[0]?.id ?? "");
+        setKeywordDraft(nextActive.keywordTargets[0]?.keyword ?? nextActive.keyword);
+      }
+    }
+  }
+
+  function handleDeleteCurrentCategory() {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`确认删除「${activeCategory.name}」吗？`)
+    ) {
+      return;
+    }
+
+    handleDeleteCategory(activeCategory.id);
+  }
+
+  function handleStartRename(categoryId: string) {
+    const targetCategory = categories.find((item) => item.id === categoryId);
+
+    setMenuState(null);
+    setRenamingCategoryId(categoryId);
+    setRenameDraft(targetCategory?.name ?? "");
+  }
+
+  function handleSubmitRename() {
+    if (!renamingCategoryId) {
+      return;
+    }
+
+    const normalized = normalizeCategoryInput(renameDraft);
+
+    if (!normalized) {
+      return;
+    }
+
+    setCategories((current) => renameReplicaCategory(current, renamingCategoryId, normalized));
+    setHistoryEntries((current) =>
+      current.map((entry) =>
+        entry.categoryId === renamingCategoryId ? { ...entry, categoryName: normalized } : entry
       )
     );
-
-    const linkedTopic = linkedTopicId
-      ? activeCategory.reports
-          .flatMap((report) => report.topics)
-          .find((topic) => topic.id === linkedTopicId)
-      : null;
-
-    const linkedReport = linkedTopic
-      ? activeCategory.reports.find((report) =>
-          report.topics.some((topic) => topic.id === linkedTopic.id)
-        )
-      : null;
-
-    setWorkbenchState((current) => ({
-      ...current,
-      activeTab: "report",
-      selectedReportDate: linkedReport?.date ?? current.selectedReportDate,
-      selectedContentDate: content.date,
-      selectedPlatformId: "all",
-      selectedContentRange: "7d",
-      contentPoolView: "all",
-      contentFocusMode: null,
-      focusedTopicId: linkedTopic?.id ?? null,
-      highlightedContentIds: []
-    }));
+    setRenamingCategoryId(null);
+    setRenameDraft("");
   }
 
-  function handleTogglePool(content: ContentItem) {
-    setWorkbenchState((current) => ({
-      ...current,
-      pooledContentIds: current.pooledContentIds.includes(content.id)
-        ? current.pooledContentIds.filter((id) => id !== content.id)
-        : [...current.pooledContentIds, content.id]
-    }));
+  async function handleQuickUpdate() {
+    const normalizedKeyword = normalizeCategoryInput(keywordDraft).toLowerCase();
+
+    if (!normalizedKeyword) {
+      return;
+    }
+
+    const existingTarget = findKeywordTargetByKeyword(activeCategory, normalizedKeyword);
+    const collectablePlatforms =
+      activePlatformId === "all"
+        ? getEnabledCollectablePlatforms(activeCategory)
+        : ([activePlatformId] as ReplicaTrackedPlatformId[]);
+    const fallbackPlatforms =
+      collectablePlatforms.length > 0
+        ? collectablePlatforms
+        : activeKeywordTarget?.platformIds.filter(isCollectablePlatform) ?? ["wechat"];
+
+    const nextCategory = existingTarget
+      ? activeCategory
+      : addKeywordTargetToCategory(activeCategory, {
+          keyword: normalizedKeyword,
+          platformIds: fallbackPlatforms
+        });
+    const nextKeywordTarget =
+      findKeywordTargetByKeyword(nextCategory, normalizedKeyword) ??
+      existingTarget ??
+      activeKeywordTarget;
+
+    if (!nextKeywordTarget) {
+      return;
+    }
+
+    if (nextCategory !== activeCategory) {
+      setCategories((current) => updateCategory(current, activeCategory.id, () => nextCategory));
+    }
+
+    setActiveKeywordTargetId(nextKeywordTarget.id);
+    setKeywordDraft(nextKeywordTarget.keyword);
+
+    await refreshKeywordTarget(nextCategory, nextKeywordTarget, activePlatformId);
+  }
+
+  function handleRerunHistoryQuery(queryId: string) {
+    const detail = historyDetail?.query.id === queryId ? historyDetail : null;
+
+    if (!detail) {
+      return;
+    }
+
+    const targetCategory =
+      categories.find((category) => category.id === detail.query.categoryId) ?? activeCategory;
+    const { nextCategory, keywordTarget } = ensureHistoryKeywordTarget(targetCategory, detail.query);
+    const platformIds = parseQueryPlatformScope(detail.query.platformScope);
+    const rerunPlatformId =
+      platformIds.length > 1
+        ? "all"
+        : (platformIds[0] as ReplicaPlatformId | undefined) ?? "wechat";
+
+    if (nextCategory !== targetCategory) {
+      setCategories((current) => updateCategory(current, targetCategory.id, () => nextCategory));
+    }
+
+    setActiveCategoryId(nextCategory.id);
+    setActiveKeywordTargetId(keywordTarget.id);
+    setKeywordDraft(detail.query.keyword);
+    setActivePlatformId(rerunPlatformId);
+    void refreshKeywordTarget(nextCategory, keywordTarget, rerunPlatformId);
   }
 
   return (
-    <section className="workbench-shell">
-      <GlobalToolbar
-        categories={monitorCategories}
-        isScanning={isScanning}
-        isCreateCategoryOpen={isCreateCategoryOpen}
-        onToggleCreateCategory={() => setIsCreateCategoryOpen((current) => !current)}
-        onToggleScan={() => setIsScanning((current) => !current)}
+    <section className="replica-shell">
+      <ReplicaSidebar
+        categories={sidebarCategories}
+        activeCategoryId={activeCategory.id}
+        createDraft={createDraft}
+        showCreateForm={showCreateForm}
+        menuState={menuState}
+        renamingCategoryId={renamingCategoryId}
+        renameDraft={renameDraft}
+        onSelectCategory={handleSelectCategory}
+        onToggleCreateForm={() => {
+          setShowCreateForm((current) => !current);
+          setMenuState(null);
+        }}
+        onCreateDraftChange={setCreateDraft}
+        onCreateCategory={handleCreateCategory}
+        onOpenMenu={(categoryId, x, y) => {
+          setMenuState({ categoryId, x, y });
+        }}
+        onCloseMenu={() => setMenuState(null)}
+        onStartRename={handleStartRename}
+        onRenameDraftChange={setRenameDraft}
+        onSubmitRename={handleSubmitRename}
+        onCancelRename={() => {
+          setRenamingCategoryId(null);
+          setRenameDraft("");
+        }}
+        onDeleteCategory={handleDeleteCategory}
       />
 
-      <div className="workbench-shell__grid">
-        <CategorySidebar
-          categories={monitorCategories}
-          selectedCategoryId={workbenchState.selectedCategoryId}
-          onCreateCategory={() => setIsCreateCategoryOpen(true)}
-          onSelectCategory={(categoryId) => {
-            setSettingsDraftTarget(null);
-
-            setWorkbenchState((current) =>
-              buildWorkbenchStateForCategory(
-                monitorCategories,
-                categoryId,
-                current.activeTab
-              )
-            );
-          }}
-        />
-
-        <main className="workbench-shell__panel workbench-shell__panel--main">
-          <WorkbenchHeader
-            activeCategory={activeCategory}
-            activeTab={workbenchState.activeTab}
-            onTabChange={(activeTab) =>
-              setWorkbenchState((current) => ({
-                ...current,
-                activeTab
-              }))
-            }
+      <main className="replica-shell__main">
+        <div className="replica-shell__workspace">
+          <ReplicaTopbar
+            category={activeCategory}
+            activeTab={activeTab}
+            currentCount={activeTab === "history" ? filteredHistoryQueries.length : displayedCount}
+            currentUpdatedAt={currentArticles[0]?.publishedAt || activeKeywordTarget?.lastRunAt || "今天"}
+            onSelectTab={setActiveTab}
           />
-          <MonitorSummaryBar activeCategory={activeCategory} />
 
-          {workbenchState.activeTab === "report" ? (
-            <>
-              <ActionDeck
-                activeCategory={activeCategory}
-                pendingActionIds={workbenchState.pendingActionIds}
-                onViewEvidence={handleActionViewEvidence}
-                onAddToPool={handleActionAddToPool}
-                onTogglePending={handleTogglePending}
+          <section className="replica-shell__workspace-body">
+            {activeTab !== "history" ? (
+              <ReplicaKeywordBar
+                keyword={keywordDraft}
+                isUpdating={isUpdating}
+                statusMessage={statusMessage}
+                onKeywordChange={setKeywordDraft}
+                onUpdate={() => void handleQuickUpdate()}
+                onToggleHistory={() => setActiveTab("history")}
               />
-              <ReportTab
-                activeCategory={activeCategory}
-                report={activeReport}
-                reportView={workbenchState.reportView}
-                onReportViewChange={(reportView) =>
-                  setWorkbenchState((current) => ({
-                    ...current,
-                    reportView
-                  }))
-                }
-                selectedReportDate={workbenchState.selectedReportDate}
-                focusedTopicId={workbenchState.focusedTopicId}
-                onSelectReportDate={(selectedReportDate) =>
-                  setWorkbenchState((current) => ({
-                    ...current,
-                    selectedReportDate,
-                    focusedTopicId: null,
-                    highlightedContentIds: []
-                  }))
-                }
-                onOpenEvidence={(topic) => handleOpenEvidence(topic, activeReport)}
-                onOpenSamples={(topic) => handleOpenSamples(topic, activeReport)}
-                onOpenTimeline={(topic) => handleOpenTimeline(topic, activeReport)}
-              />
-            </>
-          ) : workbenchState.activeTab === "content" ? (
-            <ContentTab
-              activeCategory={activeCategory}
-              selectedContentDate={workbenchState.selectedContentDate}
-              selectedPlatformId={workbenchState.selectedPlatformId}
-              selectedContentRange={workbenchState.selectedContentRange}
-              contentPoolView={workbenchState.contentPoolView}
-              contentFocusMode={workbenchState.contentFocusMode}
-              highlightedContentIds={workbenchState.highlightedContentIds}
-              pooledContentIds={workbenchState.pooledContentIds}
-              onSelectContentDate={(selectedContentDate) =>
-                setWorkbenchState((current) => ({
-                  ...current,
-                  selectedContentDate,
-                  contentFocusMode: null,
-                  focusedTopicId: null,
-                  highlightedContentIds: []
-                }))
-              }
-              onSelectPlatformId={(selectedPlatformId) =>
-                setWorkbenchState((current) => ({
-                  ...current,
-                  selectedPlatformId,
-                  contentFocusMode: null,
-                  contentPoolView: "all",
-                  focusedTopicId: null,
-                  highlightedContentIds: []
-                }))
-              }
-              onSelectContentRange={(selectedContentRange) =>
-                setWorkbenchState((current) => ({
-                  ...current,
-                  selectedContentRange,
-                  contentFocusMode: null,
-                  focusedTopicId: null,
-                  highlightedContentIds: []
-                }))
-              }
-              onSelectContentPoolView={(contentPoolView) =>
-                setWorkbenchState((current) => ({
-                  ...current,
-                  contentPoolView,
-                  contentFocusMode: null,
-                  focusedTopicId: null,
-                  highlightedContentIds: []
-                }))
-              }
-              onOpenLinkedInsight={handleOpenLinkedInsight}
-              onTogglePool={handleTogglePool}
-            />
-          ) : (
-            <SettingsTab
-              activeCategory={activeCategory}
-              draftTarget={settingsDraftTarget}
-              onAddKeyword={() => setSettingsDraftTarget("keyword")}
-              onAddAccount={() => setSettingsDraftTarget("account")}
-              onClearDraft={() => setSettingsDraftTarget(null)}
-            />
-          )}
-        </main>
+            ) : null}
 
-        <RightRail activeCategory={activeCategory} />
-      </div>
+            {activeTab === "content" ? (
+              <>
+                <div className="replica-shell__filters">
+                  <ReplicaPlatformRow
+                    platforms={replicaPlatforms}
+                    activePlatformId={activePlatformId}
+                    onSelectPlatform={(platformId) => {
+                      debugContentFlow("platform-selected", {
+                        activeKeyword,
+                        previousPlatform: activePlatformId,
+                        nextPlatform: platformId
+                      });
+                      setActivePlatformId(platformId);
+                      setSelectedCardId("");
+                    }}
+                  />
+
+                  <ReplicaDateRow
+                    dates={dateOptions}
+                    activeDateId={activeDateId}
+                    onSelectDate={(dateId) => {
+                      setActiveDateId(dateId);
+                      setSelectedCardId("");
+                    }}
+                  />
+                </div>
+
+                <ReplicaContentList
+                  keyword={activeKeyword || activeCategory.keyword}
+                  articles={visibleArticles}
+                  activePlatformId={activePlatformId}
+                  selectedCardId={selectedCardId}
+                  isLoading={isUpdating}
+                  errorMessage={currentContentState?.status === "error" ? currentContentState.error : ""}
+                  isApiSource={currentContentState?.status === "success"}
+                  onSelectCard={setSelectedCardId}
+                />
+              </>
+            ) : null}
+
+            {activeTab === "history" ? (
+              <ReplicaHistoryPage
+                loading={historyLoading}
+                detailLoading={historyDetailLoading}
+                errorMessage={historyErrorMessage}
+                queries={filteredHistoryQueries}
+                selectedQueryId={selectedHistoryQueryId}
+                detail={historyDetail}
+                platformFilter={historyPlatformFilter}
+                keywordFilter={historyKeywordFilter}
+                onPlatformFilterChange={setHistoryPlatformFilter}
+                onKeywordFilterChange={setHistoryKeywordFilter}
+                onSelectQuery={(queryId) => {
+                  if (selectedHistoryQueryId === queryId) {
+                    setSelectedHistoryQueryId(null);
+                    setHistoryDetail(null);
+                    return;
+                  }
+
+                  void loadHistoryDetail(queryId);
+                }}
+                onRestoreContent={(queryId) => {
+                  if (historyDetail?.query.id === queryId) {
+                    applyHistoricalContent(historyDetail);
+                  }
+                }}
+                onRestoreAnalysis={(queryId) => {
+                  if (historyDetail?.query.id === queryId) {
+                    applyHistoricalAnalysis(historyDetail);
+                  }
+                }}
+                onRerun={handleRerunHistoryQuery}
+              />
+            ) : null}
+
+            {activeTab === "analysis" ? (
+              <ReplicaAnalysisPanel
+                reports={analysisReports}
+                selectedReportId={selectedReportId}
+                analysisMode={analysisMode}
+                reportWindow={reportWindow}
+                onSelectReport={setSelectedReportId}
+                onSelectMode={setAnalysisMode}
+                onSelectWindow={setReportWindow}
+                onViewSupportContent={() => setActiveTab("content")}
+              />
+            ) : null}
+
+            {activeTab === "settings" ? (
+              <ReplicaSettingsPanel
+                category={activeCategory}
+                onTogglePlatform={(platformId) =>
+                  setCategories((current) =>
+                    updateCategory(current, activeCategory.id, (item) => ({
+                      ...item,
+                      platforms: item.platforms.map((platform) =>
+                        platform.id === platformId
+                          ? { ...platform, enabled: !platform.enabled }
+                          : platform
+                      )
+                    }))
+                  )
+                }
+                onAddKeywordTarget={({ keyword, platformIds }) => {
+                  const nextCategory = addKeywordTargetToCategory(activeCategory, {
+                    keyword,
+                    platformIds
+                  });
+                  const nextTarget = findKeywordTargetByKeyword(nextCategory, keyword);
+
+                  setCategories((current) => updateCategory(current, activeCategory.id, () => nextCategory));
+
+                  if (!nextTarget) {
+                    return;
+                  }
+
+                  setActiveKeywordTargetId(nextTarget.id);
+                  setKeywordDraft(nextTarget.keyword);
+                  setActivePlatformId(platformIds[0] ?? "wechat");
+
+                  const refreshPlatforms = platformIds.filter(isCollectablePlatform);
+
+                  if (refreshPlatforms.length > 0) {
+                    void refreshKeywordTarget(nextCategory, nextTarget, "all", {
+                      saveHistory: false,
+                      refreshPlatforms
+                    });
+                  }
+                }}
+                onRemoveKeywordTarget={(keywordTargetId) =>
+                  setCategories((current) =>
+                    updateCategory(current, activeCategory.id, (item) => {
+                      const target = item.keywordTargets.find((entry) => entry.id === keywordTargetId);
+                      const nextCategory = removeKeywordFromCategory(item, target?.keyword ?? "");
+
+                      if (activeKeywordTargetId === keywordTargetId) {
+                        setActiveKeywordTargetId(nextCategory.keywordTargets[0]?.id ?? "");
+                        setKeywordDraft(nextCategory.keywordTargets[0]?.keyword ?? "");
+                      }
+
+                      return nextCategory;
+                    })
+                  )
+                }
+                onAddCreator={(creator) =>
+                  setCategories((current) =>
+                    updateCategory(current, activeCategory.id, (item) => addCreatorToCategory(item, creator))
+                  )
+                }
+                onRemoveCreator={(creatorId) =>
+                  setCategories((current) =>
+                    updateCategory(current, activeCategory.id, (item) =>
+                      removeCreatorFromCategory(item, creatorId)
+                    )
+                  )
+                }
+                onDeleteCategory={handleDeleteCurrentCategory}
+              />
+            ) : null}
+          </section>
+        </div>
+      </main>
     </section>
   );
 }

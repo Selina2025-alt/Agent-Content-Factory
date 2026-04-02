@@ -19,7 +19,8 @@ export function ReportTopicCard({
     douyin: "抖音",
     xiaohongshu: "小红书",
     weibo: "微博",
-    bilibili: "B站"
+    bilibili: "B站",
+    wechat: "公众号"
   };
 
   return (

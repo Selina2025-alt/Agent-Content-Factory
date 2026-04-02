@@ -9,6 +9,11 @@ interface ContentPoolProps {
   pooledContentIds: string[];
   onOpenLinkedInsight: (content: ContentItem) => void;
   onTogglePool: (content: ContentItem) => void;
+  status?: "idle" | "loading" | "error";
+  statusMessage?: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  regionLabel?: string;
 }
 
 export function ContentPool({
@@ -18,20 +23,35 @@ export function ContentPool({
   highlightedContentIds,
   pooledContentIds,
   onOpenLinkedInsight,
-  onTogglePool
+  onTogglePool,
+  status = "idle",
+  statusMessage,
+  emptyTitle = "暂无素材",
+  emptyDescription = "当前筛选条件下没有匹配内容，试试切换平台、日期或内容池筛选。",
+  regionLabel = "内容池"
 }: ContentPoolProps) {
   return (
-    <section className="workbench-shell__content-pool" role="region" aria-label="内容池">
+    <section className="workbench-shell__content-pool" role="region" aria-label={regionLabel}>
       <div className="workbench-shell__section-heading">
         <h2>{title}</h2>
         <p>{description}</p>
       </div>
 
       <div className="workbench-shell__content-grid" aria-label="内容卡片">
-        {items.length === 0 ? (
+        {status === "loading" ? (
           <article className="workbench-shell__workspace-card">
-            <span>暂无素材</span>
-            <strong>当前筛选条件下没有匹配内容，试试切换平台、日期或内容池筛选。</strong>
+            <span>加载中</span>
+            <strong>{statusMessage ?? "正在获取内容，请稍候..."}</strong>
+          </article>
+        ) : status === "error" ? (
+          <article className="workbench-shell__workspace-card">
+            <span>获取失败</span>
+            <strong>{statusMessage ?? "内容获取失败，请稍后重试。"}</strong>
+          </article>
+        ) : items.length === 0 ? (
+          <article className="workbench-shell__workspace-card">
+            <span>{emptyTitle}</span>
+            <strong>{emptyDescription}</strong>
           </article>
         ) : (
           items.map((content) => (

@@ -14,8 +14,7 @@ export function CategorySidebar({
   onCreateCategory
 }: CategorySidebarProps) {
   const activeCategory =
-    categories.find((category) => category.id === selectedCategoryId) ??
-    categories[0];
+    categories.find((category) => category.id === selectedCategoryId) ?? categories[0];
 
   if (!activeCategory) {
     return null;
@@ -26,19 +25,16 @@ export function CategorySidebar({
     .sort((left, right) => right.hitCount - left.hitCount)
     .slice(0, 3)
     .map((keyword) => keyword.label)
-    .join("、");
+    .join(" / ");
   const keyCreators = activeCategory.settings.creators
     .slice()
     .sort((left, right) => right.hotSampleContribution - left.hotSampleContribution)
     .slice(0, 3)
     .map((creator) => creator.name)
-    .join("、");
+    .join(" / ");
 
   return (
-    <aside
-      className="workbench-shell__panel workbench-shell__panel--left"
-      aria-label="左侧面板"
-    >
+    <aside className="workbench-shell__panel workbench-shell__panel--left" aria-label="左侧面板">
       <section className="workbench-shell__panel-block">
         <div className="workbench-shell__sidebar-head">
           <div className="workbench-shell__panel-kicker">监控分类</div>
@@ -51,9 +47,8 @@ export function CategorySidebar({
             + 新分类
           </button>
         </div>
-        <p className="workbench-shell__panel-note">
-          先切分类，再进内容、报告和设置。
-        </p>
+        <p className="workbench-shell__panel-note">先切分类，再看内容、报告和设置。</p>
+
         <div className="workbench-shell__category-stack" role="list">
           {categories.map((category) => {
             const isSelected = category.id === selectedCategoryId;
@@ -77,9 +72,7 @@ export function CategorySidebar({
                 </div>
                 <p>{category.description}</p>
                 <small>
-                  {category.overview.platformCount} 平台 ·{" "}
-                  {category.overview.keywordCount} 关键词 ·{" "}
-                  {category.overview.creatorCount} 账号
+                  {`${category.overview.platformCount} 平台 · ${category.overview.keywordCount} 关键词 · ${category.overview.creatorCount} 账号`}
                 </small>
               </button>
             );
@@ -96,11 +89,11 @@ export function CategorySidebar({
           </li>
           <li>
             <span>重点关键词</span>
-            <strong>{keyKeywords}</strong>
+            <strong>{keyKeywords || "待补充"}</strong>
           </li>
           <li>
             <span>目标账号</span>
-            <strong>{keyCreators}</strong>
+            <strong>{keyCreators || "待补充"}</strong>
           </li>
         </ul>
       </section>

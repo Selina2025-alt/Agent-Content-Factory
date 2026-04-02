@@ -1,6 +1,12 @@
 export type TabId = "report" | "content" | "settings";
 export type ReportView = "daily" | "summary";
-export type PlatformId = "all" | "douyin" | "xiaohongshu" | "weibo" | "bilibili";
+export type PlatformId =
+  | "all"
+  | "douyin"
+  | "xiaohongshu"
+  | "weibo"
+  | "bilibili"
+  | "wechat";
 export type NonAggregatePlatformId = Exclude<PlatformId, "all">;
 export type TimeOfDay = "上午" | "下午" | "晚上";
 export type ContentRangeId = "24h" | "3d" | "7d";
@@ -59,18 +65,34 @@ export interface ContentItem {
   title: string;
   platformId: NonAggregatePlatformId;
   author: string;
+  summary?: string;
+  authorName?: string;
+  authorId?: string;
   publishedAt: string;
+  publishTime?: string;
+  publishTimestamp?: number;
+  updateTimestamp?: number;
   heatScore: number;
   metrics: {
     likes: string;
     comments: string;
     saves: string;
   };
+  readCount?: number;
+  likeCount?: number;
   matchedTargets: string[];
   aiSummary: string;
+  keyword?: string;
+  avatar?: string;
+  isOriginal?: boolean;
   linkedTopicIds: string[];
   includedInDailyReport: boolean;
   inTopicPool: boolean;
+  articleUrl?: string;
+  sourceUrl?: string;
+  shortLink?: string;
+  rawOrderIndex?: number;
+  sourceType?: "wechat" | "mock";
 }
 
 export interface PlatformSetting {
@@ -161,4 +183,11 @@ export interface WorkbenchState {
   highlightedContentIds: string[];
   pooledContentIds: string[];
   pendingActionIds: string[];
+}
+
+export interface CreateCategoryDraft {
+  name: string;
+  platformIds: NonAggregatePlatformId[];
+  keywords: string;
+  creators: string;
 }

@@ -1,5 +1,4 @@
-import type { MonitorCategory } from "@/lib/types";
-import type { TabId } from "@/lib/types";
+import type { MonitorCategory, TabId } from "@/lib/types";
 
 interface WorkbenchHeaderProps {
   activeCategory: MonitorCategory;
@@ -22,11 +21,9 @@ export function WorkbenchHeader({
     <header className="workbench-shell__header">
       <div className="workbench-shell__header-topline">
         <div className="workbench-shell__header-copy">
-          <div className="workbench-shell__eyebrow">选题决策工作台</div>
+          <div className="workbench-shell__eyebrow">当前分类总览</div>
           <h1 className="workbench-shell__title">{activeCategory.name}</h1>
-          <p className="workbench-shell__description">
-            {activeCategory.description}
-          </p>
+          <p className="workbench-shell__description">{activeCategory.description}</p>
         </div>
 
         <div className="workbench-shell__header-stats" aria-label="当前分类状态">
@@ -36,11 +33,11 @@ export function WorkbenchHeader({
           </article>
           <article className="workbench-shell__header-stat">
             <span>今日抓取</span>
-            <strong>{activeCategory.todayCollectionCount} 条</strong>
+            <strong>{`${activeCategory.todayCollectionCount} 条`}</strong>
           </article>
           <article className="workbench-shell__header-stat">
             <span>覆盖平台</span>
-            <strong>{activeCategory.overview.platformCount} 个</strong>
+            <strong>{`${activeCategory.overview.platformCount} 个`}</strong>
           </article>
           <article className="workbench-shell__header-stat">
             <span>日报状态</span>
@@ -57,9 +54,7 @@ export function WorkbenchHeader({
             role="tab"
             aria-selected={tab.id === activeTab}
             className={
-              tab.id === activeTab
-                ? "workbench-shell__tab is-active"
-                : "workbench-shell__tab"
+              tab.id === activeTab ? "workbench-shell__tab is-active" : "workbench-shell__tab"
             }
             onClick={() => onTabChange(tab.id)}
           >

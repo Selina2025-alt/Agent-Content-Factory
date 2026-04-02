@@ -1,0 +1,243 @@
+// @vitest-environment node
+
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createMonitoringRepository,
+  initializeMonitoringDatabase,
+  listCollectedContents,
+  listKeywordTargets,
+  listSearchQueries,
+  upsertKeywordTarget
+} from "@/lib/db/monitoring-repository";
+import {
+  listStoredContentForKeywordTarget,
+  refreshKeywordTargetPlatform
+} from "@/lib/monitoring-sync-service";
+import type { ContentItem } from "@/lib/types";
+
+describe("monitoring sync service", () => {
+  it("refreshes xiaohongshu content and persists results", async () => {
+    const repository = createMonitoringRepository(initializeMonitoringDatabase(":memory:"));
+
+    upsertKeywordTarget(repository, {
+      id: "target-1",
+      categoryId: "claude",
+      keyword: "openclaw",
+      platformIds: ["xiaohongshu"],
+      createdAt: "2026-03-31T09:00:00.000Z",
+      lastRunAt: null,
+      lastRunStatus: "idle",
+      lastResultCount: 0
+    });
+
+    const searchXiaohongshu = vi.fn().mockResolvedValue({
+      rawItems: [buildContentItem("note-older", "older", 1711700000, "xiaohongshu", 0)],
+      items: [
+        buildContentItem("note-newer", "newer", 1711900000, "xiaohongshu", 1),
+        buildContentItem("note-older", "older", 1711700000, "xiaohongshu", 0)
+      ]
+    });
+
+    const result = await refreshKeywordTargetPlatform({
+      repository,
+      categoryId: "claude",
+      keywordTarget: {
+        id: "target-1",
+        keyword: "openclaw",
+        platformIds: ["xiaohongshu"],
+        createdAt: "2026-03-31T09:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      },
+      platformId: "xiaohongshu",
+      xiaohongshuSearch: searchXiaohongshu,
+      now: () => "2026-03-31T09:10:00.000Z",
+      randomId: () => "run-1"
+    });
+
+    expect(searchXiaohongshu).toHaveBeenCalledWith("openclaw", 1, "week");
+    expect(result.items.map((item) => item.title)).toEqual(["newer", "older"]);
+
+    const stored = listStoredContentForKeywordTarget({
+      repository,
+      categoryId: "claude",
+      keywordTargetId: "target-1",
+      platformId: "xiaohongshu"
+    });
+    expect(stored.map((item) => item.title)).toEqual(["newer", "older"]);
+
+    const keywordTargets = listKeywordTargets(repository, "claude");
+    expect(keywordTargets[0]).toMatchObject({
+      lastRunStatus: "success",
+      lastResultCount: 2,
+      lastRunAt: "2026-03-31T09:10:00.000Z"
+    });
+
+    const searchQueries = listSearchQueries(repository, "claude");
+    expect(searchQueries).toHaveLength(1);
+    expect(searchQueries[0]).toMatchObject({
+      id: "query-run-1",
+      keywordTargetId: "target-1",
+      keyword: "openclaw",
+      platformScope: "xiaohongshu",
+      triggerType: "manual_refresh",
+      status: "success",
+      fetchedCount: 2,
+      cappedCount: 2,
+      startedAt: "2026-03-31T09:10:00.000Z",
+      finishedAt: "2026-03-31T09:10:00.000Z"
+    });
+
+    repository.database.close();
+  });
+
+  it("returns persisted content through the read helper", async () => {
+    const repository = createMonitoringRepository(initializeMonitoringDatabase(":memory:"));
+
+    upsertKeywordTarget(repository, {
+      id: "target-1",
+      categoryId: "claude",
+      keyword: "openclaw",
+      platformIds: ["wechat"],
+      createdAt: "2026-03-31T09:00:00.000Z",
+      lastRunAt: null,
+      lastRunStatus: "idle",
+      lastResultCount: 0
+    });
+
+    await refreshKeywordTargetPlatform({
+      repository,
+      categoryId: "claude",
+      keywordTarget: {
+        id: "target-1",
+        keyword: "openclaw",
+        platformIds: ["wechat"],
+        createdAt: "2026-03-31T09:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      },
+      platformId: "wechat",
+      wechatSearch: vi.fn().mockResolvedValue({
+        rawItems: [],
+        items: [buildContentItem("wx-1", "wechat newer", 1711900000, "wechat", 0)]
+      }),
+      now: () => "2026-03-31T09:20:00.000Z",
+      randomId: () => "run-2"
+    });
+
+    const stored = listCollectedContents(repository, {
+      categoryId: "claude",
+      keywordTargetId: "target-1",
+      platformId: "wechat"
+    });
+
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.title).toBe("wechat newer");
+
+    repository.database.close();
+  });
+
+  it("caps every keyword-platform snapshot at 20 items before persisting and reporting counts", async () => {
+    const repository = createMonitoringRepository(initializeMonitoringDatabase(":memory:"));
+
+    upsertKeywordTarget(repository, {
+      id: "target-1",
+      categoryId: "claude",
+      keyword: "claude code",
+      platformIds: ["xiaohongshu"],
+      createdAt: "2026-03-31T09:00:00.000Z",
+      lastRunAt: null,
+      lastRunStatus: "idle",
+      lastResultCount: 0
+    });
+
+    const items = Array.from({ length: 25 }, (_, index) =>
+      buildContentItem(
+        `note-${index + 1}`,
+        `note-${index + 1}`,
+        1711900000 - index * 60,
+        "xiaohongshu",
+        index
+      )
+    );
+
+    const result = await refreshKeywordTargetPlatform({
+      repository,
+      categoryId: "claude",
+      keywordTarget: {
+        id: "target-1",
+        keyword: "claude code",
+        platformIds: ["xiaohongshu"],
+        createdAt: "2026-03-31T09:00:00.000Z",
+        lastRunAt: null,
+        lastRunStatus: "idle",
+        lastResultCount: 0
+      },
+      platformId: "xiaohongshu",
+      xiaohongshuSearch: vi.fn().mockResolvedValue({
+        rawItems: items,
+        items
+      }),
+      now: () => "2026-03-31T09:10:00.000Z",
+      randomId: () => "run-capped"
+    });
+
+    expect(result.fetchedCount).toBe(25);
+    expect(result.cappedCount).toBe(20);
+    expect(result.items).toHaveLength(20);
+
+    const stored = listStoredContentForKeywordTarget({
+      repository,
+      categoryId: "claude",
+      keywordTargetId: "target-1",
+      platformId: "xiaohongshu"
+    });
+    expect(stored).toHaveLength(20);
+
+    const keywordTargets = listKeywordTargets(repository, "claude");
+    expect(keywordTargets[0]?.lastResultCount).toBe(20);
+
+    repository.database.close();
+  });
+});
+
+function buildContentItem(
+  id: string,
+  title: string,
+  publishTimestamp: number,
+  platformId: ContentItem["platformId"],
+  rawOrderIndex: number
+): ContentItem {
+  const publishedAt =
+    publishTimestamp === 1711900000 ? "2026-03-31 16:00:00" : "2026-03-29 10:00:00";
+
+  return {
+    id,
+    date: publishedAt.slice(0, 10),
+    timeOfDay: "上午",
+    title,
+    platformId,
+    author: "Tester",
+    publishedAt,
+    publishTime: publishedAt,
+    publishTimestamp,
+    heatScore: 80,
+    metrics: {
+      likes: "10",
+      comments: "5",
+      saves: "3"
+    },
+    matchedTargets: ["openclaw"],
+    aiSummary: `${title} summary`,
+    linkedTopicIds: [],
+    includedInDailyReport: false,
+    inTopicPool: false,
+    keyword: "openclaw",
+    articleUrl: "",
+    sourceUrl: "",
+    rawOrderIndex
+  };
+}
