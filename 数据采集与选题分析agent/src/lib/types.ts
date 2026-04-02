@@ -6,6 +6,7 @@ export type PlatformId =
   | "xiaohongshu"
   | "weibo"
   | "bilibili"
+  | "twitter"
   | "wechat";
 export type NonAggregatePlatformId = Exclude<PlatformId, "all">;
 export type TimeOfDay = "上午" | "下午" | "晚上";
