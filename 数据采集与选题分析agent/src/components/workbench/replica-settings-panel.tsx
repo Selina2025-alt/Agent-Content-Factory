@@ -1,10 +1,7 @@
 import { useMemo, useState } from "react";
 
-import type {
-  ReplicaCategory,
-  ReplicaPlatformSetting,
-  ReplicaTrackedPlatformId
-} from "@/lib/replica-workbench-data";
+import type { ReplicaCategory, ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
+import { replicaPlatforms } from "@/lib/replica-workbench-data";
 
 interface ReplicaSettingsPanelProps {
   category: ReplicaCategory;
@@ -17,10 +14,10 @@ interface ReplicaSettingsPanelProps {
 }
 
 function isKeywordPlatformDisabled(
-  platform: ReplicaPlatformSetting,
+  platformId: ReplicaTrackedPlatformId,
   enabledPlatformIds: ReplicaTrackedPlatformId[]
 ) {
-  return !platform.enabled || !enabledPlatformIds.includes(platform.id);
+  return !enabledPlatformIds.includes(platformId);
 }
 
 export function ReplicaSettingsPanel({
@@ -42,6 +39,14 @@ export function ReplicaSettingsPanel({
     () => category.platforms.filter((platform) => platform.enabled).map((platform) => platform.id),
     [category.platforms]
   );
+  const keywordPlatforms = useMemo(
+    () =>
+      replicaPlatforms.filter(
+        (platform): platform is (typeof replicaPlatforms)[number] & { id: ReplicaTrackedPlatformId } =>
+          platform.id !== "all"
+      ),
+    []
+  );
 
   const canSubmitKeyword =
     keywordDraft.trim().length > 0 &&
@@ -62,9 +67,7 @@ export function ReplicaSettingsPanel({
       return;
     }
 
-    const nextPlatformIds = selectedKeywordPlatforms.filter((platformId) =>
-      enabledPlatforms.includes(platformId)
-    );
+    const nextPlatformIds = selectedKeywordPlatforms.filter((platformId) => enabledPlatforms.includes(platformId));
 
     if (nextPlatformIds.length === 0) {
       return;
@@ -86,9 +89,7 @@ export function ReplicaSettingsPanel({
           {category.platforms.map((platform) => (
             <button
               key={platform.id}
-              className={`replica-shell__platform-setting ${
-                platform.enabled ? "is-enabled" : ""
-              }`}
+              className={`replica-shell__platform-setting ${platform.enabled ? "is-enabled" : ""}`}
               data-testid={`settings-platform-${platform.id}`}
               type="button"
               onClick={() => onTogglePlatform(platform.id)}
@@ -122,17 +123,15 @@ export function ReplicaSettingsPanel({
           }}
         />
         <div className="replica-shell__settings-platform-picker">
-          {category.platforms.map((platform) => {
+          {keywordPlatforms.map((platform) => {
             const isSelected = selectedKeywordPlatforms.includes(platform.id);
-            const isDisabled = isKeywordPlatformDisabled(platform, enabledPlatforms);
+            const isDisabled = isKeywordPlatformDisabled(platform.id, enabledPlatforms);
 
             return (
               <button
                 key={platform.id}
                 type="button"
-                className={`replica-shell__keyword-platform-chip ${
-                  isSelected ? "is-selected" : ""
-                }`}
+                className={`replica-shell__keyword-platform-chip ${isSelected ? "is-selected" : ""}`}
                 data-testid={`keyword-platform-${platform.id}`}
                 aria-pressed={isSelected}
                 disabled={isDisabled}
@@ -156,7 +155,7 @@ export function ReplicaSettingsPanel({
               </div>
               <div className="replica-shell__tag-list">
                 {target.platformIds.map((platformId) => {
-                  const platform = category.platforms.find((item) => item.id === platformId);
+                  const platform = replicaPlatforms.find((item) => item.id === platformId);
 
                   return (
                     <span key={`${target.id}-${platformId}`} className="replica-shell__tag-item">

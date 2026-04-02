@@ -3,13 +3,47 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import MonitoringWorkbench from "@/components/workbench/monitoring-workbench";
+import ReplicaSettingsPanel from "@/components/workbench/replica-settings-panel";
+import { initialReplicaCategories } from "@/lib/replica-workbench-data";
 
 describe("replica workbench fetch", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the unified refresh api for the current platform and shows xiaohongshu results", async () => {
+  it("allows twitter/x in the keyword platform picker after the platform is enabled", async () => {
+    const user = userEvent.setup();
+    const onAddKeywordTarget = vi.fn();
+    const category = {
+      ...initialReplicaCategories[0]!,
+      platforms: initialReplicaCategories[0]!.platforms.map((platform) =>
+        platform.id === "twitter" ? { ...platform, enabled: true } : platform
+      )
+    };
+
+    render(
+      <ReplicaSettingsPanel
+        category={category}
+        onTogglePlatform={vi.fn()}
+        onAddKeywordTarget={onAddKeywordTarget}
+        onRemoveKeywordTarget={vi.fn()}
+        onAddCreator={vi.fn()}
+        onRemoveCreator={vi.fn()}
+        onDeleteCategory={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByPlaceholderText("输入新的监控关键词"), "twitter launch");
+    await user.click(screen.getByTestId("keyword-platform-twitter"));
+    await user.click(screen.getByRole("button", { name: /新增关键词/ }));
+
+    expect(onAddKeywordTarget).toHaveBeenCalledWith({
+      keyword: "twitter launch",
+      platformIds: expect.arrayContaining(["twitter"])
+    });
+  });
+
+  it("uses the unified refresh api for the current twitter/x platform and labels twitter content clearly", async () => {
     const user = userEvent.setup();
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -19,7 +53,31 @@ describe("replica workbench fetch", () => {
         return {
           ok: true,
           json: async () => ({
-            keywordTargets: []
+            keywordTargets: [
+              {
+                id: "claude-keyword-1",
+                keyword: "claude code",
+                platformIds: ["twitter"],
+                createdAt: "2026-03-31T08:00:00.000Z",
+                lastRunAt: null,
+                lastRunStatus: "idle",
+                lastResultCount: 0
+              }
+            ]
+          })
+        };
+      }
+
+      if (url === "/api/content/list?categoryId=claude&keywordTargetId=claude-keyword-1&platformId=twitter") {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [],
+            meta: {
+              source: "twitter",
+              sortedBy: "publish_time_desc",
+              persisted: true
+            }
           })
         };
       }
@@ -27,64 +85,44 @@ describe("replica workbench fetch", () => {
       if (url === "/api/content/refresh") {
         const body = JSON.parse(String(init?.body));
 
-        expect(body.platformId).toBe("xiaohongshu");
+        expect(body.platformId).toBe("twitter");
         expect(body.keyword).toBe("claude code");
 
         return {
           ok: true,
           json: async () => ({
-            rawItems: [
-              {
-                id: "xhs-older",
-                date: "2026-03-29",
-                timeOfDay: "上午",
-                title: "older note",
-                platformId: "xiaohongshu",
-                author: "旧作者",
-                authorName: "旧作者",
-                authorId: "old-user",
-                publishedAt: "2026-03-29 08:00:00",
-                publishTime: "2026-03-29 08:00:00",
-                publishTimestamp: 1711670400,
-                heatScore: 77,
-                metrics: { likes: "9", comments: "1", saves: "10" },
-                matchedTargets: ["claude code"],
-                aiSummary: "old summary",
-                summary: "old summary",
-                linkedTopicIds: [],
-                includedInDailyReport: false,
-                inTopicPool: false,
-                rawOrderIndex: 0
-              }
-            ],
+            rawItems: [],
             items: [
               {
-                id: "xhs-new",
+                id: "tw-1",
                 date: "2026-03-31",
                 timeOfDay: "上午",
-                title: "Claude Code 小红书新样本",
-                platformId: "xiaohongshu",
-                author: "小红书作者",
-                authorName: "小红书作者",
-                authorId: "xhs-user",
-                publishedAt: "2026-03-31 09:00:00",
-                publishTime: "2026-03-31 09:00:00",
-                publishTimestamp: 1711846800,
-                heatScore: 88,
-                metrics: { likes: "12", comments: "3", saves: "14" },
+                title: "Twitter/X signal for Claude Code",
+                platformId: "twitter",
+                author: "X Author",
+                authorName: "X Author",
+                authorId: "x-author",
+                publishedAt: "2026-03-31 10:20:00",
+                publishTime: "2026-03-31 10:20:00",
+                publishTimestamp: 1711870800,
+                heatScore: 93,
+                metrics: { likes: "21", comments: "4", saves: "2" },
                 matchedTargets: ["claude code"],
-                aiSummary: "summary",
-                summary: "summary",
+                aiSummary: "twitter summary",
+                summary: "twitter summary",
                 linkedTopicIds: [],
                 includedInDailyReport: false,
                 inTopicPool: false,
-                rawOrderIndex: 1
+                rawOrderIndex: 0,
+                articleUrl: "https://x.com/example/status/1"
               }
             ],
             meta: {
-              source: "xiaohongshu",
+              source: "twitter",
               sortedBy: "publish_time_desc",
-              persisted: true
+              persisted: true,
+              fetchedCount: 1,
+              cappedCount: 1
             }
           })
         };
@@ -96,7 +134,7 @@ describe("replica workbench fetch", () => {
           json: async () => ({
             items: [],
             meta: {
-              source: "xiaohongshu",
+              source: "twitter",
               sortedBy: "publish_time_desc",
               persisted: true
             }
@@ -111,19 +149,23 @@ describe("replica workbench fetch", () => {
 
     render(<MonitoringWorkbench />);
 
-    await user.click(screen.getByTestId("platform-filter-xiaohongshu"));
-    await user.click(screen.getByRole("button", { name: /一键更新/i }));
+    await user.click(screen.getByRole("button", { name: "监控设置" }));
+    await user.click(screen.getByTestId("settings-platform-twitter"));
+    await user.click(screen.getByRole("button", { name: "内容" }));
+    await user.click(screen.getByTestId("platform-filter-twitter"));
+    await user.click(screen.getByRole("button", { name: /一键更新/ }));
 
-    const articleTitle = await screen.findByText("Claude Code 小红书新样本");
-    const card = articleTitle.closest(".replica-shell__content-card");
+    const articleTitle = await screen.findByText("Twitter/X signal for Claude Code");
+
+    expect(
+      within(articleTitle.closest(".replica-shell__content-card") as HTMLElement).getByText("Twitter/X")
+    ).toBeInTheDocument();
     expect(screen.getByText("按点赞数排序 · 真实数据")).toBeInTheDocument();
-    expect(screen.getByText(/当前来源：小红书关键词结果/)).toBeInTheDocument();
-    expect(within(card as HTMLElement).queryByRole("link", { name: "查看笔记原文" })).toBeNull();
-    return;
-
-    expect(screen.getByText(/页面展示顺序：按 publish_time 倒序/)).toBeInTheDocument();
-    expect(screen.getByText(/当前来源：小红书关键词结果/)).toBeInTheDocument();
-    expect(within(card as HTMLElement).queryByRole("link", { name: "查看笔记原文" })).toBeNull();
+    expect(screen.getByText("当前来源：Twitter/X 原文")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看推文原文" })).toHaveAttribute(
+      "href",
+      "https://x.com/example/status/1"
+    );
   });
 
   it("keeps mock content and shows the api error when update fails", async () => {
@@ -163,6 +205,7 @@ describe("replica workbench fetch", () => {
 
     expect(screen.getAllByText(/当前筛选下暂无内容|本地原型示例内容|小红书实时结果/).length).toBeGreaterThan(0);
   });
+
   it("rehydrates persisted keyword target metadata and loads stored content after a reload", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -197,7 +240,7 @@ describe("replica workbench fetch", () => {
               {
                 id: "wx-persisted",
                 date: "2026-03-31",
-                timeOfDay: "涓婂崍",
+                timeOfDay: "上午",
                 title: "Persisted wechat article",
                 platformId: "wechat",
                 author: "Persisted Author",
@@ -306,7 +349,7 @@ describe("replica workbench fetch", () => {
     const xiaohongshuItems = Array.from({ length: 20 }, (_, index) => ({
       id: `xhs-${index + 1}`,
       date: "2026-03-31",
-      timeOfDay: "涓婂崍",
+      timeOfDay: "上午",
       title: `xiaohongshu item ${index + 1}`,
       platformId: "xiaohongshu",
       author: `author ${index + 1}`,
@@ -387,6 +430,8 @@ describe("replica workbench fetch", () => {
 
     await screen.findByText("xiaohongshu item 1");
 
+    expect(screen.getByText("按点赞数排序 · 真实数据")).toBeInTheDocument();
+    expect(screen.getByText("当前来源：小红书原文")).toBeInTheDocument();
     expect(
       container.querySelector(".replica-shell__category-card.is-active .replica-shell__category-meta")?.textContent
     ).toContain("20");
@@ -406,7 +451,7 @@ describe("replica workbench fetch", () => {
     expect(container.querySelector(".replica-shell__content-head h3")?.textContent).toContain("0");
   });
 
-  it("refreshes every collectable platform when the all-platform view is selected", async () => {
+  it("refreshes only the enabled and configured collectable platforms in the all-platform view", async () => {
     const user = userEvent.setup();
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -432,7 +477,7 @@ describe("replica workbench fetch", () => {
               {
                 id: `${body.platformId}-1`,
                 date: "2026-03-31",
-                timeOfDay: "涓婂崍",
+                timeOfDay: "上午",
                 title: `${body.platformId} item`,
                 platformId: body.platformId,
                 author: `${body.platformId} author`,
@@ -471,7 +516,7 @@ describe("replica workbench fetch", () => {
               {
                 id: "wechat-1",
                 date: "2026-03-31",
-                timeOfDay: "涓婂崍",
+                timeOfDay: "上午",
                 title: "wechat item",
                 platformId: "wechat",
                 author: "wechat author",
@@ -493,7 +538,7 @@ describe("replica workbench fetch", () => {
               {
                 id: "xiaohongshu-1",
                 date: "2026-03-31",
-                timeOfDay: "涓婂崍",
+                timeOfDay: "上午",
                 title: "xiaohongshu item",
                 platformId: "xiaohongshu",
                 author: "xiaohongshu author",
@@ -558,5 +603,114 @@ describe("replica workbench fetch", () => {
       "wechat",
       "xiaohongshu"
     ]);
+  });
+
+  it("refreshes twitter/x in the all-platform view only after the platform is enabled and configured", async () => {
+    const user = userEvent.setup();
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url === "/api/keyword-targets?categoryId=claude") {
+        return {
+          ok: true,
+          json: async () => ({
+            keywordTargets: [
+              {
+                id: "claude-keyword-1",
+                keyword: "claude code",
+                platformIds: ["wechat", "xiaohongshu", "twitter"],
+                createdAt: "2026-03-31T08:00:00.000Z",
+                lastRunAt: null,
+                lastRunStatus: "idle",
+                lastResultCount: 0
+              }
+            ]
+          })
+        };
+      }
+
+      if (url === "/api/content/refresh") {
+        const body = JSON.parse(String(init?.body));
+
+        return {
+          ok: true,
+          json: async () => ({
+            rawItems: [],
+            items: [],
+            meta: {
+              source: body.platformId,
+              sortedBy: "publish_time_desc",
+              persisted: true,
+              fetchedCount: 0,
+              cappedCount: 0
+            }
+          })
+        };
+      }
+
+      if (url.startsWith("/api/content/list")) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [],
+            meta: {
+              source: "all",
+              sortedBy: "publish_time_desc",
+              persisted: true,
+              fetchedCount: 0,
+              cappedCount: 0
+            }
+          })
+        };
+      }
+
+      throw new Error(`Unexpected fetch url: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<MonitoringWorkbench />);
+
+    await user.click(screen.getByRole("button", { name: "监控设置" }));
+    await user.click(screen.getByTestId("settings-platform-twitter"));
+    await user.click(screen.getByRole("button", { name: "内容" }));
+    await user.click(screen.getByTestId("platform-filter-all"));
+    await user.click(screen.getByRole("button", { name: "一键更新" }));
+
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => String(url) === "/api/content/refresh");
+    expect(refreshCalls).toHaveLength(3);
+    expect(refreshCalls.map(([, init]) => JSON.parse(String(init?.body)).platformId)).toEqual([
+      "wechat",
+      "xiaohongshu",
+      "twitter"
+    ]);
+  });
+
+  it("shows an empty state for twitter/x when there is no twitter content", async () => {
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+
+        if (url === "/api/keyword-targets?categoryId=claude") {
+          return {
+            ok: true,
+            json: async () => ({ keywordTargets: [] })
+          };
+        }
+
+        throw new Error(`Unexpected fetch url: ${url}`);
+      })
+    );
+
+    render(<MonitoringWorkbench />);
+
+    await user.click(screen.getByTestId("platform-filter-twitter"));
+
+    expect(await screen.findByText("当前筛选下暂无内容")).toBeInTheDocument();
+    expect(screen.queryByText("Claude Code + 开源工具的暴力工作流，下次直接躺赢")).not.toBeInTheDocument();
   });
 });

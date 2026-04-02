@@ -142,20 +142,41 @@ function buildContentState(
 
 function isCollectablePlatform(
   platformId: ReplicaTrackedPlatformId
-): platformId is "wechat" | "xiaohongshu" {
-  return platformId === "wechat" || platformId === "xiaohongshu";
+): platformId is "wechat" | "xiaohongshu" | "twitter" {
+  return platformId === "wechat" || platformId === "xiaohongshu" || platformId === "twitter";
 }
 
 function sortRawReplicaArticles(rawItems: ReplicaArticle[]) {
   return [...rawItems].sort((left, right) => (left.rawOrderIndex ?? 0) - (right.rawOrderIndex ?? 0));
 }
 
-function getEnabledCollectablePlatforms(category: ReplicaCategory) {
+function getEnabledCollectablePlatforms(category: ReplicaCategory): ReplicaTrackedPlatformId[] {
   const enabledPlatformIds = category.platforms
     .filter((platform) => platform.enabled)
     .map((platform) => platform.id);
 
   return enabledPlatformIds.filter(isCollectablePlatform);
+}
+
+function getCollectablePlatformsForTarget(
+  category: ReplicaCategory,
+  keywordTarget: ReplicaKeywordTarget,
+  requestedPlatformId: ReplicaPlatformId
+) {
+  const enabledCollectablePlatforms = getEnabledCollectablePlatforms(category);
+
+  if (requestedPlatformId === "all") {
+    return keywordTarget.platformIds.filter(
+      (platformId) => isCollectablePlatform(platformId) && enabledCollectablePlatforms.includes(platformId)
+    );
+  }
+
+  return keywordTarget.platformIds.filter(
+    (platformId) =>
+      isCollectablePlatform(platformId) &&
+      platformId === requestedPlatformId &&
+      enabledCollectablePlatforms.includes(platformId)
+  );
 }
 
 function findKeywordTargetByKeyword(category: ReplicaCategory, keyword: string) {
@@ -749,24 +770,12 @@ export function MonitoringWorkbench() {
       return;
     }
 
-    const enabledCollectablePlatforms = getEnabledCollectablePlatforms(category);
     const refreshPlatforms =
       options?.refreshPlatforms ??
-      (requestedPlatformId === "all"
-        ? keywordTarget.platformIds.filter(
-            (platformId) =>
-              isCollectablePlatform(platformId) &&
-              enabledCollectablePlatforms.includes(platformId)
-          )
-        : keywordTarget.platformIds.filter(
-            (platformId) =>
-              isCollectablePlatform(platformId) &&
-              platformId === requestedPlatformId &&
-              enabledCollectablePlatforms.includes(platformId)
-          ));
+      getCollectablePlatformsForTarget(category, keywordTarget, requestedPlatformId);
 
     if (refreshPlatforms.length === 0) {
-      setStatusMessage("当前关键词没有可更新的平台，请先在监控设置里启用公众号或小红书。");
+      setStatusMessage("当前关键词没有可更新的平台，请先在监控设置里启用公众号、小红书或 Twitter/X。");
       return;
     }
 
@@ -1054,7 +1063,13 @@ export function MonitoringWorkbench() {
     const fallbackPlatforms =
       collectablePlatforms.length > 0
         ? collectablePlatforms
-        : activeKeywordTarget?.platformIds.filter(isCollectablePlatform) ?? ["wechat"];
+        : activeKeywordTarget?.platformIds.filter(
+            (platformId) =>
+              isCollectablePlatform(platformId) &&
+              activeCategory.platforms.some(
+                (platform) => platform.id === platformId && platform.enabled
+              )
+          ) ?? ["wechat"];
 
     const nextCategory = existingTarget
       ? activeCategory
@@ -1281,7 +1296,11 @@ export function MonitoringWorkbench() {
                   setKeywordDraft(nextTarget.keyword);
                   setActivePlatformId(platformIds[0] ?? "wechat");
 
-                  const refreshPlatforms = platformIds.filter(isCollectablePlatform);
+                  const refreshPlatforms = platformIds.filter((platformId) =>
+                    activeCategory.platforms.some(
+                      (platform) => platform.id === platformId && platform.enabled && isCollectablePlatform(platformId)
+                    )
+                  );
 
                   if (refreshPlatforms.length > 0) {
                     void refreshKeywordTarget(nextCategory, nextTarget, "all", {

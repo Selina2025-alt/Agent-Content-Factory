@@ -33,8 +33,16 @@ function buildEmptySourceSummary(activePlatformId: ReplicaPlatformId) {
   if (activePlatformId === "xiaohongshu") {
     return {
       listLabel: "小红书实时结果",
-      proofLabel: "当前来源：小红书关键词结果",
+      proofLabel: "当前来源：小红书原文",
       verifyLabel: "来源类型 小红书实时结果"
+    };
+  }
+
+  if (activePlatformId === "twitter") {
+    return {
+      listLabel: "Twitter/X 实时结果",
+      proofLabel: "当前来源：Twitter/X 原文",
+      verifyLabel: "来源类型 Twitter/X 实时结果"
     };
   }
 
@@ -64,8 +72,9 @@ function buildSourceSummary(articles: ReplicaArticle[], isApiSource: boolean) {
 
   const hasWechat = articles.some((item) => item.platformId === "wechat");
   const hasXiaohongshu = articles.some((item) => item.platformId === "xiaohongshu");
+  const hasTwitter = articles.some((item) => item.platformId === "twitter");
 
-  if (hasWechat && !hasXiaohongshu) {
+  if (hasWechat && !hasXiaohongshu && !hasTwitter) {
     return {
       listLabel: "公众号实时结果",
       proofLabel: "当前来源：公众号原文",
@@ -73,11 +82,19 @@ function buildSourceSummary(articles: ReplicaArticle[], isApiSource: boolean) {
     };
   }
 
-  if (hasXiaohongshu && !hasWechat) {
+  if (hasXiaohongshu && !hasWechat && !hasTwitter) {
     return {
       listLabel: "小红书实时结果",
-      proofLabel: "当前来源：小红书关键词结果",
+      proofLabel: "当前来源：小红书原文",
       verifyLabel: "来源类型 小红书实时结果"
+    };
+  }
+
+  if (hasTwitter && !hasWechat && !hasXiaohongshu) {
+    return {
+      listLabel: "Twitter/X 实时结果",
+      proofLabel: "当前来源：Twitter/X 原文",
+      verifyLabel: "来源类型 Twitter/X 实时结果"
     };
   }
 
@@ -95,6 +112,10 @@ function buildLinkLabel(article: ReplicaArticle) {
 
   if (article.platformId === "xiaohongshu") {
     return "查看笔记原文";
+  }
+
+  if (article.platformId === "twitter") {
+    return "查看推文原文";
   }
 
   return "查看原文";
@@ -148,7 +169,7 @@ export function ReplicaContentList({
   const linkableCount = displayArticles.filter((item) => Boolean(item.articleUrl)).length;
   const wechatCount = displayArticles.filter((item) => item.platformId === "wechat").length;
   const xiaohongshuCount = displayArticles.filter((item) => item.platformId === "xiaohongshu").length;
-  const apiCount = displayArticles.filter((item) => item.source === "api").length;
+  const twitterCount = displayArticles.filter((item) => item.platformId === "twitter").length;
   const sourceSummary =
     displayArticles.length === 0 && isApiSource
       ? buildEmptySourceSummary(activePlatformId)
@@ -158,7 +179,7 @@ export function ReplicaContentList({
 
   const sideMetrics = [
     {
-      label: "可验证原文",
+      label: "可验原文",
       value: linkableCount,
       width: buildRatio(linkableCount, displayArticles.length)
     },
@@ -173,9 +194,9 @@ export function ReplicaContentList({
       width: buildRatio(xiaohongshuCount, displayArticles.length)
     },
     {
-      label: "实时返回",
-      value: apiCount,
-      width: buildRatio(apiCount, displayArticles.length)
+      label: "Twitter/X 来源",
+      value: twitterCount,
+      width: buildRatio(twitterCount, displayArticles.length)
     }
   ];
 
@@ -298,12 +319,12 @@ export function ReplicaContentList({
             <div className="replica-shell__metric-bars">
               {sideMetrics.map((metric) => (
                 <div key={metric.label} className="replica-shell__metric-row">
-                  <div className="replica-shell__metric-meta">
+                  <div className="replica-shell__metric-copy">
                     <span>{metric.label}</span>
                     <strong>{metric.value}</strong>
                   </div>
                   <div className="replica-shell__metric-track">
-                    <div
+                    <i
                       className="replica-shell__metric-fill"
                       style={{ width: `${metric.width}%` }}
                     />
