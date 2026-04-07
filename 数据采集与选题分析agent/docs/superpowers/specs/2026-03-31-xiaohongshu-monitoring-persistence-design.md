@@ -203,7 +203,7 @@ searchXiaohongshuNotesSnapshotByKeyword(keyword, page = 1, noteTime = "day")
 }
 ```
 
-`Authorization` token 只从服务端环境变量读取。本轮将用户提供的 `yADEpRL41Ul6FxgoczQW9c81KY0g1S15` 视为 Bearer token 使用，但不会写入前端代码。
+`Authorization` token 只从服务端环境变量读取。本轮将用户提供的 Bearer token 视为服务端机密配置使用，但不会写入前端代码或提交到版本库。
 
 ### 小红书结果排序
 

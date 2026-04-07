@@ -134,6 +134,34 @@ export function ensureMonitoringSchema(database: MonitoringDatabase) {
     CREATE INDEX IF NOT EXISTS analysis_topics_lookup_idx
       ON analysis_topics (snapshot_id);
 
+    CREATE TABLE IF NOT EXISTS analysis_settings (
+      singleton_key TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL,
+      time TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      model TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS analysis_evidence_items (
+      id TEXT PRIMARY KEY,
+      snapshot_id TEXT NOT NULL,
+      content_id TEXT NOT NULL,
+      keyword TEXT NOT NULL,
+      platform_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      brief_summary TEXT NOT NULL,
+      key_facts_json TEXT NOT NULL,
+      keywords_json TEXT NOT NULL,
+      highlights_json TEXT NOT NULL,
+      attention_signals_json TEXT NOT NULL,
+      topic_angles_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS analysis_evidence_items_snapshot_idx
+      ON analysis_evidence_items (snapshot_id);
+
     INSERT INTO search_query_contents (
       search_query_id,
       category_id,

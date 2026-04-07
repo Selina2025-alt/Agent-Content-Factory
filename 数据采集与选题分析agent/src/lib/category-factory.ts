@@ -30,6 +30,10 @@ const PLATFORM_META: Record<
     label: "B站",
     recommendation: "适合补齐深度讲解和长内容样本。"
   },
+  twitter: {
+    label: "Twitter/X",
+    recommendation: "适合跟踪海外讨论、开发者动态和实时观点。"
+  },
   wechat: {
     label: "公众号",
     recommendation: "适合补齐深度文章和观点型样本。"
@@ -149,9 +153,9 @@ export function buildCategoryFromDraft(draft: CreateCategoryDraft): MonitorCateg
     reports: [
       {
         date: today,
-        hotSummary: "新分类已创建，等待首次扫描后生成热点摘要。",
+        hotSummary: "新分类已创建，等待首轮扫描后生成热点摘要。",
         focusSummary: "先确认关键词与目标账号是否覆盖到你最关心的内容源。",
-        patternSummary: "暂无跨平台模式结论，建议先看内容 Tab 的公众号文章结果。",
+        patternSummary: "暂无跨平台模式结论，建议先看内容 Tab 的实际结果。",
         insightSummary: "首轮采集完成后，这里会生成可追溯的选题判断。",
         platformsInvolved: platformIds.length,
         topicCount: 0,
@@ -178,7 +182,7 @@ export function buildCategoryFromDraft(draft: CreateCategoryDraft): MonitorCateg
     },
     decisionSignals: {
       priorityDistribution: [
-        `优先补齐 ${primaryKeyword} 的首轮文章样本`,
+        `优先补齐 ${primaryKeyword} 的首轮内容样本`,
         "确认平台覆盖是否需要继续扩展",
         `观察 ${primaryCreator} 是否值得长期跟踪`
       ],

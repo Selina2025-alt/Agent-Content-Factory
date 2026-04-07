@@ -7,6 +7,7 @@ const repository = { database: { close: vi.fn() } };
 const listSearchQueriesMock = vi.fn();
 const getSearchQueryByIdMock = vi.fn();
 const getAnalysisSnapshotBySearchQueryMock = vi.fn();
+const getAnalysisEvidenceItemsBySnapshotIdMock = vi.fn();
 const listCollectedContentsBySearchQueryMock = vi.fn();
 
 vi.mock("@/lib/db/monitoring-repository", () => ({
@@ -14,6 +15,7 @@ vi.mock("@/lib/db/monitoring-repository", () => ({
   listSearchQueries: listSearchQueriesMock,
   getSearchQueryById: getSearchQueryByIdMock,
   getAnalysisSnapshotBySearchQuery: getAnalysisSnapshotBySearchQueryMock,
+  getAnalysisEvidenceItemsBySnapshotId: getAnalysisEvidenceItemsBySnapshotIdMock,
   listCollectedContentsBySearchQuery: listCollectedContentsBySearchQueryMock
 }));
 
@@ -87,6 +89,23 @@ describe("history api", () => {
       },
       topics: []
     });
+    getAnalysisEvidenceItemsBySnapshotIdMock.mockReturnValue([
+      {
+        id: "evidence-1",
+        snapshotId: "query-1-analysis",
+        contentId: "wx-1",
+        keyword: "claude code",
+        platformId: "wechat",
+        title: "wechat article",
+        briefSummary: "summary",
+        keyFacts: [],
+        keywords: ["claude"],
+        highlights: [],
+        attentionSignals: [],
+        topicAngles: [],
+        createdAt: "2026-04-01T10:01:00.000Z"
+      }
+    ]);
     listCollectedContentsBySearchQueryMock.mockReturnValue([
       {
         id: "wx-1",
@@ -103,6 +122,10 @@ describe("history api", () => {
 
     expect(getSearchQueryByIdMock).toHaveBeenCalledWith(repository, "query-1");
     expect(getAnalysisSnapshotBySearchQueryMock).toHaveBeenCalledWith(repository, "query-1");
+    expect(getAnalysisEvidenceItemsBySnapshotIdMock).toHaveBeenCalledWith(
+      repository,
+      "query-1-analysis"
+    );
     expect(listCollectedContentsBySearchQueryMock).toHaveBeenCalledWith(repository, {
       searchQueryId: "query-1"
     });

@@ -1,15 +1,33 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { ReplicaCategory, ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
 import { replicaPlatforms } from "@/lib/replica-workbench-data";
 
+export interface ReplicaGlobalAnalysisSettings {
+  enabled: boolean;
+  time: string;
+  provider: string;
+  model: string;
+}
+
+const DEFAULT_GLOBAL_ANALYSIS_SETTINGS: ReplicaGlobalAnalysisSettings = {
+  enabled: true,
+  time: "08:00",
+  provider: "SiliconFlow",
+  model: "zai-org/GLM-5"
+};
+
 interface ReplicaSettingsPanelProps {
   category: ReplicaCategory;
+  globalAnalysisSettings?: ReplicaGlobalAnalysisSettings;
+  isSavingAnalysisSettings?: boolean;
+  analysisSettingsMessage?: string;
   onTogglePlatform: (platformId: string) => void;
   onAddKeywordTarget: (input: { keyword: string; platformIds: ReplicaTrackedPlatformId[] }) => void;
   onRemoveKeywordTarget: (keywordTargetId: string) => void;
   onAddCreator: (creator: string) => void;
   onRemoveCreator: (creatorId: string) => void;
+  onSaveGlobalAnalysisSettings?: (settings: ReplicaGlobalAnalysisSettings) => void;
   onDeleteCategory: () => void;
 }
 
@@ -22,18 +40,24 @@ function isKeywordPlatformDisabled(
 
 export function ReplicaSettingsPanel({
   category,
+  globalAnalysisSettings,
+  isSavingAnalysisSettings,
+  analysisSettingsMessage,
   onTogglePlatform,
   onAddKeywordTarget,
   onRemoveKeywordTarget,
   onAddCreator,
   onRemoveCreator,
+  onSaveGlobalAnalysisSettings,
   onDeleteCategory
 }: ReplicaSettingsPanelProps) {
+  const resolvedGlobalAnalysisSettings = globalAnalysisSettings ?? DEFAULT_GLOBAL_ANALYSIS_SETTINGS;
   const [keywordDraft, setKeywordDraft] = useState("");
   const [creatorDraft, setCreatorDraft] = useState("");
   const [selectedKeywordPlatforms, setSelectedKeywordPlatforms] = useState<ReplicaTrackedPlatformId[]>([
     "wechat"
   ]);
+  const [analysisSettingsDraft, setAnalysisSettingsDraft] = useState(resolvedGlobalAnalysisSettings);
 
   const enabledPlatforms = useMemo(
     () => category.platforms.filter((platform) => platform.enabled).map((platform) => platform.id),
@@ -51,6 +75,10 @@ export function ReplicaSettingsPanel({
   const canSubmitKeyword =
     keywordDraft.trim().length > 0 &&
     selectedKeywordPlatforms.some((platformId) => enabledPlatforms.includes(platformId));
+
+  useEffect(() => {
+    setAnalysisSettingsDraft(resolvedGlobalAnalysisSettings);
+  }, [resolvedGlobalAnalysisSettings]);
 
   function handleToggleKeywordPlatform(platformId: ReplicaTrackedPlatformId) {
     setSelectedKeywordPlatforms((current) =>
@@ -211,6 +239,63 @@ export function ReplicaSettingsPanel({
               </button>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="replica-shell__settings-card">
+        <h4>全局分析设置</h4>
+        <div className="replica-shell__analysis-settings-form">
+          <label className="replica-shell__analysis-settings-toggle">
+            <input
+              type="checkbox"
+              checked={analysisSettingsDraft.enabled}
+              onChange={(event) =>
+                setAnalysisSettingsDraft((current) => ({
+                  ...current,
+                  enabled: event.target.checked
+                }))
+              }
+            />
+            <span>启用每日定时分析</span>
+          </label>
+
+          <label className="replica-shell__analysis-settings-field">
+            <span>执行时间</span>
+            <input
+              className="replica-shell__settings-input"
+              type="time"
+              value={analysisSettingsDraft.time}
+              onChange={(event) =>
+                setAnalysisSettingsDraft((current) => ({
+                  ...current,
+                  time: event.target.value || "08:00"
+                }))
+              }
+            />
+          </label>
+
+          <div className="replica-shell__rule-list">
+            <span>AI 服务：{analysisSettingsDraft.provider}</span>
+            <span>分析模型：{analysisSettingsDraft.model}</span>
+            <span>到点后会先重抓所有监控关键词，再分析前一天有数据的关键词。</span>
+          </div>
+
+          <div className="replica-shell__settings-card-head">
+            <span className="replica-shell__settings-tip">
+              未自定义时默认每天 08:00 自动执行。
+            </span>
+            <button
+              type="button"
+              disabled={isSavingAnalysisSettings}
+              onClick={() => onSaveGlobalAnalysisSettings?.(analysisSettingsDraft)}
+            >
+              {isSavingAnalysisSettings ? "保存中..." : "保存设置"}
+            </button>
+          </div>
+
+          {analysisSettingsMessage ? (
+            <p className="replica-shell__settings-feedback">{analysisSettingsMessage}</p>
+          ) : null}
         </div>
       </section>
 

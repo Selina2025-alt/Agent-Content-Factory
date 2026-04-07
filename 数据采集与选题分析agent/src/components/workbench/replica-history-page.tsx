@@ -5,6 +5,7 @@ import {
   type ReplicaPlatformId,
   type ReplicaTrackedPlatformId
 } from "@/lib/replica-workbench-data";
+import type { ReplicaAnalysisEvidenceItem } from "@/components/workbench/replica-analysis-panel";
 import type { ContentItem } from "@/lib/types";
 
 export interface ReplicaHistoryQuery {
@@ -47,6 +48,7 @@ export interface ReplicaHistoryDetail {
           growth: string;
           supportContentIds: string[];
         }>;
+        evidenceItems: ReplicaAnalysisEvidenceItem[];
       }
     | null;
   items: ContentItem[];

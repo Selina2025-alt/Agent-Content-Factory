@@ -8,6 +8,15 @@ interface ReportTopicCardProps {
   onOpenTimeline: (topic: TopicIdea) => void;
 }
 
+const PLATFORM_LABELS: Record<TopicIdea["sourcePlatforms"][number], string> = {
+  douyin: "抖音",
+  xiaohongshu: "小红书",
+  weibo: "微博",
+  bilibili: "B站",
+  twitter: "Twitter/X",
+  wechat: "公众号"
+};
+
 export function ReportTopicCard({
   topic,
   isFocused,
@@ -15,14 +24,6 @@ export function ReportTopicCard({
   onOpenSamples,
   onOpenTimeline
 }: ReportTopicCardProps) {
-  const platformLabelMap: Record<TopicIdea["sourcePlatforms"][number], string> = {
-    douyin: "抖音",
-    xiaohongshu: "小红书",
-    weibo: "微博",
-    bilibili: "B站",
-    wechat: "公众号"
-  };
-
   return (
     <article
       className={
@@ -41,7 +42,7 @@ export function ReportTopicCard({
       <div className="workbench-shell__chip-row">
         {topic.sourcePlatforms.map((platform) => (
           <span key={platform} className="workbench-shell__inline-chip">
-            {platformLabelMap[platform]}
+            {PLATFORM_LABELS[platform]}
           </span>
         ))}
       </div>

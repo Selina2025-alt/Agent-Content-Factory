@@ -1,6 +1,12 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import type { ContentItem, TimeOfDay } from "@/lib/types";
 
 const TWITTER_RECENT_SEARCH_ENDPOINT = "https://api.x.com/2/tweets/search/recent";
+const TWITTER_FETCH_TIMEOUT_MS = 15_000;
+const POWERSHELL_FETCH_TIMEOUT_MS = 30_000;
+const execFileAsync = promisify(execFile);
 
 interface TwitterRecentSearchTweet {
   author_id?: string;
@@ -30,6 +36,11 @@ interface TwitterRecentSearchResponse {
   includes?: {
     users?: TwitterRecentSearchUser[];
   };
+}
+
+interface TwitterPowerShellProbeResponse {
+  status: number;
+  body: string;
 }
 
 export interface TwitterPostsSnapshot {
@@ -153,13 +164,21 @@ function formatTwitterError(payload: TwitterRecentSearchResponse, status: number
   return `Twitter monitor request failed with status ${status}`;
 }
 
-async function fetchTwitterMonitorData(keyword: string) {
-  const token = process.env.TWITTER_BEARER_TOKEN;
-
-  if (!token) {
-    throw new Error("Missing TWITTER_BEARER_TOKEN");
+function formatTwitterRequestFailure(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Twitter monitor request failed";
   }
 
+  const cause = error.cause as { code?: string; message?: string } | undefined;
+
+  if (cause?.code === "UND_ERR_CONNECT_TIMEOUT") {
+    return "Twitter monitor request timed out while connecting to the X API";
+  }
+
+  return error.message || "Twitter monitor request failed";
+}
+
+function buildTwitterSearchUrl(keyword: string) {
   const url = new URL(TWITTER_RECENT_SEARCH_ENDPOINT);
   url.searchParams.set("query", keyword);
   url.searchParams.set("max_results", "10");
@@ -167,13 +186,154 @@ async function fetchTwitterMonitorData(keyword: string) {
   url.searchParams.set("expansions", "author_id");
   url.searchParams.set("user.fields", "username,name,profile_image_url");
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
-    cache: "no-store"
-  });
+  return url;
+}
+
+function parseTwitterResponseBody(body: string) {
+  if (!body) {
+    return {} as TwitterRecentSearchResponse;
+  }
+
+  try {
+    return JSON.parse(body) as TwitterRecentSearchResponse;
+  } catch {
+    return {
+      errors: [
+        {
+          detail: body
+        }
+      ]
+    } satisfies TwitterRecentSearchResponse;
+  }
+}
+
+async function fetchTwitterMonitorDataViaPowerShell(keyword: string) {
+  const encodedUrl = buildTwitterSearchUrl(keyword).toString().replace(/'/g, "''");
+  const encodedCommand = Buffer.from(
+    `
+$ErrorActionPreference = 'Stop'
+$rawToken = $env:TWITTER_BEARER_TOKEN
+$token = [System.Uri]::UnescapeDataString($rawToken)
+$uri = '${encodedUrl}'
+
+try {
+  $response = Invoke-WebRequest -Uri $uri -Headers @{ Authorization = "Bearer $token" } -Method GET -TimeoutSec 20 -UseBasicParsing
+  $payload = @{ status = [int]$response.StatusCode; body = $response.Content } | ConvertTo-Json -Compress
+  Write-Output $payload
+}
+catch {
+  $status = 0
+  $body = ''
+
+  if ($_.Exception.Response) {
+    $status = [int]$_.Exception.Response.StatusCode.value__
+    $stream = $_.Exception.Response.GetResponseStream()
+
+    if ($stream) {
+      $reader = New-Object System.IO.StreamReader($stream)
+      $body = $reader.ReadToEnd()
+      $reader.Dispose()
+    }
+  }
+  else {
+    $body = $_.Exception.Message
+  }
+
+  $payload = @{ status = $status; body = $body } | ConvertTo-Json -Compress
+  Write-Output $payload
+
+  if ($status -eq 0) {
+    exit 1
+  }
+}
+`,
+    "utf16le"
+  ).toString("base64");
+
+  try {
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      ["-NoLogo", "-NoProfile", "-EncodedCommand", encodedCommand],
+      {
+        timeout: POWERSHELL_FETCH_TIMEOUT_MS,
+        windowsHide: true,
+        maxBuffer: 4 * 1024 * 1024,
+        env: process.env
+      }
+    );
+    const probe = JSON.parse(stdout.trim()) as TwitterPowerShellProbeResponse;
+    const payload = parseTwitterResponseBody(probe.body);
+
+    if (probe.status >= 200 && probe.status < 300) {
+      return payload;
+    }
+
+    throw new Error(formatTwitterError(payload, probe.status || 502));
+  } catch (error) {
+    if (error && typeof error === "object" && "stdout" in error && typeof error.stdout === "string") {
+      try {
+        const probe = JSON.parse(error.stdout.trim()) as TwitterPowerShellProbeResponse;
+        const payload = parseTwitterResponseBody(probe.body);
+
+        if (probe.status >= 200 && probe.status < 300) {
+          return payload;
+        }
+
+        throw new Error(formatTwitterError(payload, probe.status || 502));
+      } catch {
+        // fall through to the generic request failure below
+      }
+    }
+
+    throw new Error(formatTwitterRequestFailure(error));
+  }
+}
+
+function normalizeBearerToken(token: string | undefined) {
+  if (!token) {
+    return "";
+  }
+
+  if (!token.includes("%")) {
+    return token;
+  }
+
+  try {
+    return decodeURIComponent(token);
+  } catch {
+    return token;
+  }
+}
+
+async function fetchTwitterMonitorData(keyword: string) {
+  const token = normalizeBearerToken(process.env.TWITTER_BEARER_TOKEN);
+
+  if (!token) {
+    throw new Error("Missing TWITTER_BEARER_TOKEN");
+  }
+
+  const url = buildTwitterSearchUrl(keyword);
+  let response: Response;
+
+  try {
+    response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TWITTER_FETCH_TIMEOUT_MS)
+    });
+  } catch (error) {
+    return fetchTwitterMonitorDataViaPowerShell(keyword).catch((fallbackError) => {
+      if (fallbackError instanceof Error) {
+        throw fallbackError;
+      }
+
+      throw new Error(formatTwitterRequestFailure(error));
+    });
+  }
+
   const payload = (await response.json()) as TwitterRecentSearchResponse;
   const hasTweetArray = Array.isArray(payload.data);
 

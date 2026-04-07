@@ -6,6 +6,7 @@ import {
   type PersistedKeywordTarget,
   upsertAnalysisSnapshot
 } from "@/lib/db/monitoring-repository";
+import { buildFreshAnalysisReport } from "@/lib/analysis-report";
 import { buildAnalysisArchiveSnapshot } from "@/lib/history-archive";
 import { refreshKeywordTargetPlatform, type SyncablePlatformId } from "@/lib/monitoring-sync-service";
 import type { ReplicaDailyReport, ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
@@ -65,7 +66,17 @@ export async function POST(request: NextRequest) {
       lastRunStatus: body.lastRunStatus ?? "idle",
       lastResultCount: body.lastResultCount ?? 0
     };
-    const keywordTarget = persistedKeywordTarget ?? fallbackKeywordTarget;
+    const mergedPlatformIds = Array.from(
+      new Set<ReplicaTrackedPlatformId>([
+        ...(persistedKeywordTarget?.platformIds ?? fallbackKeywordTarget.platformIds),
+        ...platformIds,
+        platformId
+      ])
+    );
+    const keywordTarget = {
+      ...(persistedKeywordTarget ?? fallbackKeywordTarget),
+      platformIds: mergedPlatformIds
+    };
 
     const snapshot = await refreshKeywordTargetPlatform({
       repository,
@@ -74,21 +85,23 @@ export async function POST(request: NextRequest) {
       platformId: platformId as SyncablePlatformId
     });
 
-    if (Array.isArray(body.reports) && body.reports.length > 0) {
-      upsertAnalysisSnapshot(
-        repository,
-        buildAnalysisArchiveSnapshot({
-          searchQueryId: snapshot.searchQueryId,
-          categoryId,
-          keyword,
-          reports: body.reports
-        })
-      );
-    }
+    const freshReport = buildFreshAnalysisReport(keyword, snapshot.items, new Date());
+
+    upsertAnalysisSnapshot(
+      repository,
+      buildAnalysisArchiveSnapshot({
+        searchQueryId: snapshot.searchQueryId,
+        categoryId,
+        keyword,
+        reports: [freshReport],
+        generatedAt: freshReport.date
+      })
+    );
 
     return NextResponse.json({
       items: snapshot.items,
       rawItems: snapshot.rawItems,
+      report: freshReport,
       meta: {
         source: platformId,
         sortedBy: "publish_time_desc",

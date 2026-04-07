@@ -1728,11 +1728,24 @@ a {
   gap: 12px;
 }
 
+.replica-shell__analysis-toolbar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .replica-shell__analysis-dates {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 2px;
+  flex: 1;
+}
+
+.replica-shell__analysis-run {
+  min-width: 148px;
+  flex-shrink: 0;
 }
 
 .replica-shell__report-chip {
@@ -1768,6 +1781,12 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.replica-shell__analysis-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--replica-text-secondary);
 }
 
 .replica-shell__mini-switch {
@@ -1866,6 +1885,48 @@ a {
   margin-top: 12px;
 }
 
+.replica-shell__evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.replica-shell__evidence-card {
+  padding: 14px;
+  border-radius: var(--replica-radius-md);
+  border: 1px solid var(--replica-line);
+  background: var(--replica-panel-soft);
+  box-shadow: var(--replica-shadow-xs);
+}
+
+.replica-shell__evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.replica-shell__evidence-head strong {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--replica-text);
+}
+
+.replica-shell__evidence-head span {
+  font-size: 12px;
+  color: var(--replica-text-tertiary);
+  text-transform: capitalize;
+}
+
+.replica-shell__evidence-points {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--replica-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 .replica-shell__summary-shell {
   margin-top: 12px;
 }
@@ -1921,6 +1982,35 @@ a {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.replica-shell__analysis-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.replica-shell__analysis-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--replica-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.replica-shell__analysis-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--replica-text-secondary);
+  font-size: 13px;
+}
+
+.replica-shell__settings-tip,
+.replica-shell__settings-feedback {
+  font-size: 13px;
+  color: var(--replica-text-secondary);
 }
 
 .replica-shell__danger-button {

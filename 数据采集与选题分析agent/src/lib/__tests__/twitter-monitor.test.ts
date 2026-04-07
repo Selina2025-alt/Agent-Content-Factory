@@ -33,6 +33,28 @@ describe("twitter monitor", () => {
     );
   });
 
+  it("decodes url-encoded bearer tokens before calling x api", async () => {
+    vi.stubEnv("TWITTER_BEARER_TOKEN", "token%2Fwith%3Dencoding");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => buildRecentSearchPayload([])
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await searchTwitterPostsSnapshotByKeyword("claude code");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token/with=encoding"
+        })
+      })
+    );
+  });
+
   it("throws when the bearer token is missing", async () => {
     vi.stubGlobal(
       "fetch",

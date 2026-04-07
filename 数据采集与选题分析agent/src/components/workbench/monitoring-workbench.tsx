@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { ReplicaAnalysisPanel } from "@/components/workbench/replica-analysis-panel";
+import {
+  ReplicaAnalysisPanel,
+  type ReplicaAnalysisDetail
+} from "@/components/workbench/replica-analysis-panel";
 import { ReplicaContentList } from "@/components/workbench/replica-content-list";
 import { ReplicaDateRow } from "@/components/workbench/replica-date-row";
 import {
@@ -12,9 +15,17 @@ import {
 } from "@/components/workbench/replica-history-page";
 import { ReplicaKeywordBar } from "@/components/workbench/replica-keyword-bar";
 import { ReplicaPlatformRow } from "@/components/workbench/replica-platform-row";
-import { ReplicaSettingsPanel } from "@/components/workbench/replica-settings-panel";
+import {
+  ReplicaSettingsPanel,
+  type ReplicaGlobalAnalysisSettings
+} from "@/components/workbench/replica-settings-panel";
 import { ReplicaSidebar } from "@/components/workbench/replica-sidebar";
 import { ReplicaTopbar } from "@/components/workbench/replica-topbar";
+import {
+  buildFreshAnalysisReport,
+  mergeFreshReportIntoReports,
+  mergePersistedReportsIntoReports
+} from "@/lib/analysis-report";
 import {
   initialReplicaCategories,
   replicaPlatforms,
@@ -47,6 +58,7 @@ import {
   saveSearchHistoryEntry,
   type SearchHistoryEntry
 } from "@/lib/search-history";
+import { formatLocalDateTime } from "@/lib/time-utils";
 import type { ContentItem } from "@/lib/types";
 
 interface ContentResponseMeta {
@@ -61,6 +73,7 @@ interface ContentResponsePayload {
   error?: string;
   items?: ContentItem[];
   rawItems?: ContentItem[];
+  report?: ReplicaCategory["reports"][number] | null;
   meta?: ContentResponseMeta | null;
 }
 
@@ -79,6 +92,32 @@ interface HistoryDetailResponsePayload {
   query?: ReplicaHistoryQuery;
   analysis?: ReplicaHistoryDetail["analysis"];
   items?: ContentItem[];
+}
+
+interface AnalysisReportsResponsePayload {
+  error?: string;
+  reports?: ReplicaCategory["reports"];
+}
+
+interface AnalysisRunResponsePayload {
+  error?: string;
+  report?: ReplicaCategory["reports"][number] | null;
+  detail?: ReplicaAnalysisDetail | null;
+  meta?: {
+    refreshedPlatforms: ReplicaTrackedPlatformId[];
+    skipped: boolean;
+    reason?: string;
+  };
+}
+
+interface AnalysisSettingsResponsePayload {
+  error?: string;
+  settings?: ReplicaGlobalAnalysisSettings;
+  task?: {
+    ok: boolean;
+    taskName: string;
+    message: string;
+  };
 }
 
 interface ContentState {
@@ -179,6 +218,27 @@ function getCollectablePlatformsForTarget(
   );
 }
 
+function ensureKeywordTargetPlatform(
+  category: ReplicaCategory,
+  keywordTargetId: string,
+  platformId: ReplicaTrackedPlatformId
+) {
+  return {
+    ...category,
+    platforms: category.platforms.map((platform) =>
+      platform.id === platformId ? { ...platform, enabled: true } : platform
+    ),
+    keywordTargets: category.keywordTargets.map((target) =>
+      target.id === keywordTargetId && !target.platformIds.includes(platformId)
+        ? {
+            ...target,
+            platformIds: [...target.platformIds, platformId]
+          }
+        : target
+    )
+  };
+}
+
 function findKeywordTargetByKeyword(category: ReplicaCategory, keyword: string) {
   const normalized = normalizeCategoryInput(keyword).toLowerCase();
   return category.keywordTargets.find((item) => item.keyword === normalized);
@@ -191,23 +251,6 @@ function parseQueryPlatformScope(platformScope: string): ReplicaTrackedPlatformI
     .split(",")
     .map((part) => part.trim())
     .filter((part): part is ReplicaTrackedPlatformId => trackedPlatforms.has(part as ReplicaTrackedPlatformId));
-}
-
-function createHistoryQueryFallbackEntries(entries: SearchHistoryEntry[]): ReplicaHistoryQuery[] {
-  return entries.map((entry) => ({
-    id: entry.id,
-    categoryId: entry.categoryId,
-    keywordTargetId: null,
-    keyword: entry.keyword,
-    platformScope: "wechat",
-    triggerType: "manual_refresh",
-    status: "success",
-    fetchedCount: 0,
-    cappedCount: 0,
-    startedAt: entry.searchedAt,
-    finishedAt: entry.searchedAt,
-    errorMessage: null
-  }));
 }
 
 function buildArchivedReports(detail: NonNullable<ReplicaHistoryDetail["analysis"]>): ReplicaCategory["reports"] {
@@ -265,6 +308,20 @@ export function MonitoringWorkbench() {
   const [historyKeywordFilter, setHistoryKeywordFilter] = useState("");
   const [contentStates, setContentStates] = useState<Record<string, ContentState>>({});
   const [archivedReports, setArchivedReports] = useState<ReplicaCategory["reports"] | null>(null);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [analysisStatusMessage, setAnalysisStatusMessage] = useState("");
+  const [selectedSupportTopicId, setSelectedSupportTopicId] = useState<string | null>(null);
+  const [analysisDetailsByReportId, setAnalysisDetailsByReportId] = useState<
+    Record<string, ReplicaAnalysisDetail>
+  >({});
+  const [globalAnalysisSettings, setGlobalAnalysisSettings] = useState<ReplicaGlobalAnalysisSettings>({
+    enabled: true,
+    time: "08:00",
+    provider: "SiliconFlow",
+    model: "zai-org/GLM-5"
+  });
+  const [isSavingAnalysisSettings, setIsSavingAnalysisSettings] = useState(false);
+  const [analysisSettingsMessage, setAnalysisSettingsMessage] = useState("");
 
   const activeCategory =
     categories.find((item) => item.id === activeCategoryId) ?? categories[0] ?? initialReplicaCategories[0];
@@ -275,6 +332,7 @@ export function MonitoringWorkbench() {
     activeCategory.keywordTargets[0];
   const activeKeywordTargetKeyword = activeKeywordTarget?.keyword ?? "";
   const analysisReports = archivedReports ?? activeCategory.reports;
+  const activeAnalysisDetail = analysisDetailsByReportId[selectedReportId] ?? null;
 
   const activeKeyword = activeKeywordTarget?.keyword ?? normalizeCategoryInput(keywordDraft).toLowerCase();
   const currentStateKey = buildContentStateKey(
@@ -299,8 +357,22 @@ export function MonitoringWorkbench() {
           : mockArticles,
     [currentContentState, hasPersistedRun, mockArticles]
   );
+  const latestReportDate = analysisReports[0]?.date ?? "";
+  const latestArticlePublishedAt = currentArticles[0]?.publishedAt ?? "";
+  const timelineAnchorDate = useMemo(
+    () =>
+      activeKeywordTarget?.lastRunAt ||
+      latestReportDate ||
+      latestArticlePublishedAt ||
+      new Date().toISOString(),
+    [activeKeywordTarget?.lastRunAt, latestArticlePublishedAt, latestReportDate]
+  );
+  const currentUpdatedAt = timelineAnchorDate;
 
-  const dateOptions = useMemo(() => buildDateOptions(currentArticles), [currentArticles]);
+  const dateOptions = useMemo(
+    () => buildDateOptions(currentArticles, timelineAnchorDate),
+    [currentArticles, timelineAnchorDate]
+  );
   const visibleArticles = useMemo(
     () => filterReplicaArticles(currentArticles, activePlatformId, activeDateId),
     [activeDateId, activePlatformId, currentArticles]
@@ -346,6 +418,10 @@ export function MonitoringWorkbench() {
   }, []);
 
   useEffect(() => {
+    void loadGlobalAnalysisSettings();
+  }, []);
+
+  useEffect(() => {
     if (!analysisReports.some((item) => item.id === selectedReportId)) {
       setSelectedReportId(analysisReports[0]?.id ?? "");
     }
@@ -368,12 +444,12 @@ export function MonitoringWorkbench() {
   }, [activeKeywordTargetId, activeKeywordTargetKeyword]);
 
   useEffect(() => {
-    const nextDateId = getDefaultDateId(currentArticles) ?? "";
+    const nextDateId = getDefaultDateId(currentArticles, timelineAnchorDate) ?? "";
 
     if (!activeDateId || !dateOptions.some((item) => item.id === activeDateId)) {
       setActiveDateId(nextDateId);
     }
-  }, [activeDateId, currentArticles, dateOptions]);
+  }, [activeDateId, currentArticles, dateOptions, timelineAnchorDate]);
 
   useEffect(() => {
     if (!selectedCardId || !visibleArticles.some((item) => item.id === selectedCardId)) {
@@ -434,7 +510,9 @@ export function MonitoringWorkbench() {
 
     async function loadKeywordTargetsFromPersistence() {
       try {
-        const response = await fetch(`/api/keyword-targets?categoryId=${activeCategory.id}`);
+        const response = await fetch(`/api/keyword-targets?categoryId=${activeCategory.id}`, {
+          cache: "no-store"
+        });
         const payload = (await response.json()) as KeywordTargetsResponsePayload;
 
         if (!response.ok || cancelled || !payload.keywordTargets) {
@@ -475,6 +553,61 @@ export function MonitoringWorkbench() {
     currentStateKey,
     contentStates
   ]);
+
+  useEffect(() => {
+    if (activeTab !== "analysis" || typeof fetch !== "function" || !activeKeywordTargetKeyword) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadLatestAnalysisReports() {
+      try {
+        const params = new URLSearchParams({
+          categoryId: activeCategory.id,
+          keyword: activeKeywordTargetKeyword,
+          limit: "14"
+        });
+        const response = await fetch(`/api/analysis/reports?${params.toString()}`, {
+          cache: "no-store"
+        });
+        const payload = (await response.json()) as AnalysisReportsResponsePayload;
+
+        if (!response.ok || cancelled || !payload.reports?.length) {
+          return;
+        }
+
+        setCategories((current) =>
+          updateCategory(current, activeCategory.id, (category) => ({
+            ...category,
+            reports: mergePersistedReportsIntoReports(category.reports, payload.reports ?? [])
+          }))
+        );
+        setSelectedReportId(payload.reports[0]?.id ?? "");
+        setArchivedReports(null);
+      } catch {
+        // Keep local reports when analysis history is unavailable.
+      }
+    }
+
+    void loadLatestAnalysisReports();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategory.id, activeKeywordTarget?.lastRunAt, activeKeywordTargetKeyword, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "analysis" || !selectedReportId || analysisDetailsByReportId[selectedReportId]) {
+      return;
+    }
+
+    void loadAnalysisDetail(selectedReportId);
+  }, [activeTab, analysisDetailsByReportId, selectedReportId]);
+
+  useEffect(() => {
+    setSelectedSupportTopicId(null);
+  }, [selectedReportId]);
 
   useEffect(() => {
     if (activeTab !== "history") {
@@ -555,7 +688,9 @@ export function MonitoringWorkbench() {
         params.set("platformId", platformId);
       }
 
-      const response = await fetch(`/api/content/list?${params.toString()}`);
+      const response = await fetch(`/api/content/list?${params.toString()}`, {
+        cache: "no-store"
+      });
       const payload = (await response.json()) as ContentResponsePayload;
 
       if (!response.ok) {
@@ -605,7 +740,7 @@ export function MonitoringWorkbench() {
     }
   }
 
-  async function loadHistoryQueries(_categoryId: string) {
+  async function loadHistoryQueries(categoryId: string) {
     if (typeof fetch !== "function") {
       return;
     }
@@ -614,7 +749,9 @@ export function MonitoringWorkbench() {
     setHistoryErrorMessage("");
 
     try {
-      const response = await fetch("/api/history");
+      const response = await fetch(`/api/history?categoryId=${encodeURIComponent(categoryId)}`, {
+        cache: "no-store"
+      });
       const payload = (await response.json()) as HistoryListResponsePayload;
 
       if (!response.ok) {
@@ -639,10 +776,8 @@ export function MonitoringWorkbench() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "History load failed";
-      const fallbackQueries = createHistoryQueryFallbackEntries(historyEntries);
-
-      setHistoryQueries(fallbackQueries);
-      setHistoryErrorMessage(fallbackQueries.length > 0 ? "" : message);
+      setHistoryQueries([]);
+      setHistoryErrorMessage(message);
       setSelectedHistoryQueryId(null);
       setHistoryDetail(null);
     } finally {
@@ -659,7 +794,9 @@ export function MonitoringWorkbench() {
     setHistoryErrorMessage("");
 
     try {
-      const response = await fetch(`/api/history/${queryId}`);
+      const response = await fetch(`/api/history/${queryId}`, {
+        cache: "no-store"
+      });
       const payload = (await response.json()) as HistoryDetailResponsePayload;
 
       if (!response.ok || !payload.query) {
@@ -678,6 +815,87 @@ export function MonitoringWorkbench() {
       setHistoryDetail(null);
     } finally {
       setHistoryDetailLoading(false);
+    }
+  }
+
+  async function loadGlobalAnalysisSettings() {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/analysis/settings", {
+        cache: "no-store"
+      });
+      const payload = (await response.json()) as AnalysisSettingsResponsePayload;
+
+      if (!response.ok || !payload.settings) {
+        return;
+      }
+
+      setGlobalAnalysisSettings(payload.settings);
+    } catch {
+      // Keep default settings when the API is unavailable.
+    }
+  }
+
+  async function saveGlobalAnalysisSettings(settings: ReplicaGlobalAnalysisSettings) {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    setIsSavingAnalysisSettings(true);
+    setAnalysisSettingsMessage("");
+
+    try {
+      const response = await fetch("/api/analysis/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(settings)
+      });
+      const payload = (await response.json()) as AnalysisSettingsResponsePayload;
+
+      if (!response.ok || !payload.settings) {
+        throw new Error(payload.error || "保存分析设置失败");
+      }
+
+      setGlobalAnalysisSettings(payload.settings);
+      setAnalysisSettingsMessage(payload.task?.message ?? "分析设置已保存");
+    } catch (error) {
+      setAnalysisSettingsMessage(error instanceof Error ? error.message : "保存分析设置失败");
+    } finally {
+      setIsSavingAnalysisSettings(false);
+    }
+  }
+
+  async function loadAnalysisDetail(reportId: string) {
+    if (typeof fetch !== "function") {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/analysis/report/${reportId}`, {
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as ReplicaAnalysisDetail;
+
+      if (!payload?.snapshot?.id) {
+        return;
+      }
+
+      setAnalysisDetailsByReportId((current) => ({
+        ...current,
+        [payload.snapshot.id]: payload
+      }));
+    } catch {
+      // Keep the existing report shell when detail lookup is unavailable.
     }
   }
 
@@ -753,8 +971,17 @@ export function MonitoringWorkbench() {
       return;
     }
 
-    setArchivedReports(buildArchivedReports(detail.analysis));
-    setSelectedReportId(detail.analysis.snapshot.id);
+    const analysisDetail: ReplicaAnalysisDetail = {
+      ...detail.analysis,
+      evidenceItems: detail.analysis.evidenceItems ?? []
+    };
+
+    setAnalysisDetailsByReportId((current) => ({
+      ...current,
+      [analysisDetail.snapshot.id]: analysisDetail
+    }));
+    setArchivedReports(buildArchivedReports(analysisDetail));
+    setSelectedReportId(analysisDetail.snapshot.id);
     setActiveTab("analysis");
     setStatusMessage(`已恢复 ${detail.query.keyword} 的历史选题快照。`);
   }
@@ -775,6 +1002,31 @@ export function MonitoringWorkbench() {
       getCollectablePlatformsForTarget(category, keywordTarget, requestedPlatformId);
 
     if (refreshPlatforms.length === 0) {
+      const unavailablePlatformId =
+        requestedPlatformId === "all"
+          ? "all"
+          : (requestedPlatformId as ReplicaPlatformId);
+      const unavailableKey = buildContentStateKey(
+        category.id,
+        keywordTarget.id,
+        unavailablePlatformId
+      );
+      const unavailableMessage =
+        "当前关键词没有可更新的平台，请先在监控设置里启用公众号、小红书或 Twitter/X。";
+
+      setContentStates((current) => ({
+        ...current,
+        [unavailableKey]: {
+          ...buildContentState(
+            keywordTarget.id,
+            unavailablePlatformId,
+            keywordTarget.keyword,
+            current[unavailableKey]
+          ),
+          status: "error",
+          error: unavailableMessage
+        }
+      }));
       setStatusMessage("当前关键词没有可更新的平台，请先在监控设置里启用公众号、小红书或 Twitter/X。");
       return;
     }
@@ -795,6 +1047,9 @@ export function MonitoringWorkbench() {
 
     let lastError = "";
     let failedPlatformId: ReplicaTrackedPlatformId | null = null;
+    let latestReport: ReplicaCategory["reports"][number] | null = null;
+    let latestRunLabel = "";
+    const refreshedContentItems: ContentItem[] = [];
 
     try {
       for (const platformId of refreshPlatforms) {
@@ -838,7 +1093,12 @@ export function MonitoringWorkbench() {
         const rawItems = sortRawReplicaArticles(
           mapContentItemsToReplicaArticles(payload.rawItems ?? [], keywordTarget.keyword)
         );
-        const finishedAt = new Date().toISOString();
+        const finishedAt = new Date();
+        const finishedAtIso = finishedAt.toISOString();
+
+        latestRunLabel = formatLocalDateTime(finishedAt);
+        latestReport = payload.report ?? latestReport;
+        refreshedContentItems.push(...(payload.items ?? []));
 
         setContentStates((current) => ({
           ...current,
@@ -865,12 +1125,35 @@ export function MonitoringWorkbench() {
 
         patchKeywordTargetState(category.id, keywordTarget.id, (target) => ({
           ...target,
-          lastRunAt: finishedAt,
+          lastRunAt: finishedAtIso,
           lastRunStatus: "success",
           lastResultCount: items.length
         }));
         setArchivedReports(null);
       }
+
+      const freshReport =
+        refreshPlatforms.length > 1
+          ? buildFreshAnalysisReport(keywordTarget.keyword, refreshedContentItems, latestRunLabel || new Date())
+          : latestReport ??
+            buildFreshAnalysisReport(keywordTarget.keyword, refreshedContentItems, latestRunLabel || new Date());
+
+      setCategories((current) =>
+        updateCategory(current, category.id, (item) => ({
+          ...item,
+          reports: mergeFreshReportIntoReports(item.reports, freshReport)
+        }))
+      );
+      setSelectedReportId(freshReport.id);
+      setArchivedReports(null);
+
+      const refreshedReplicaArticles = mapContentItemsToReplicaArticles(
+        refreshedContentItems,
+        keywordTarget.keyword
+      );
+
+      setActiveDateId(getDefaultDateId(refreshedReplicaArticles, latestReport?.date || new Date()) ?? "");
+      setSelectedCardId("");
 
       if (requestedPlatformId === "all" || refreshPlatforms.length > 1) {
         await loadStoredContent(category, keywordTarget, "all", { quiet: true });
@@ -916,8 +1199,104 @@ export function MonitoringWorkbench() {
     } finally {
       setIsUpdating(false);
       if (lastError) {
-        setStatusMessage("");
+        setStatusMessage(lastError);
       }
+    }
+  }
+
+  async function handleRunAnalysis() {
+    if (typeof fetch !== "function") {
+      setAnalysisStatusMessage("当前环境无法发起分析，请在浏览器中重试。");
+      return;
+    }
+
+    if (!activeKeywordTarget) {
+      setAnalysisStatusMessage("当前没有可分析的关键词。");
+      return;
+    }
+
+    const platformIds = getCollectablePlatformsForTarget(activeCategory, activeKeywordTarget, "all");
+
+    if (platformIds.length === 0) {
+      setAnalysisStatusMessage("当前关键词还没有启用可分析的平台，请先在监控设置中开启。");
+      return;
+    }
+
+    setAnalysisRunning(true);
+    setAnalysisStatusMessage("");
+
+    try {
+      const response = await fetch("/api/analysis/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          categoryId: activeCategory.id,
+          keywordTargetId: activeKeywordTarget.id,
+          keyword: activeKeywordTarget.keyword,
+          platformIds,
+          createdAt: activeKeywordTarget.createdAt,
+          lastRunAt: activeKeywordTarget.lastRunAt,
+          lastRunStatus: activeKeywordTarget.lastRunStatus,
+          lastResultCount: activeKeywordTarget.lastResultCount,
+          mode: "manual"
+        })
+      });
+      const payload = (await response.json()) as AnalysisRunResponsePayload;
+
+      if (!response.ok) {
+        throw new Error(payload.error || "立即分析失败");
+      }
+
+      if (payload.meta?.skipped || !payload.report) {
+        setAnalysisStatusMessage(payload.meta?.reason ?? "当前没有可分析的有效内容。");
+        return;
+      }
+
+      setCategories((current) =>
+        updateCategory(current, activeCategory.id, (category) => ({
+          ...category,
+          reports: mergeFreshReportIntoReports(category.reports, payload.report!)
+        }))
+      );
+
+      if (payload.detail?.snapshot?.id) {
+        setAnalysisDetailsByReportId((current) => ({
+          ...current,
+          [payload.detail!.snapshot.id]: payload.detail!
+        }));
+      }
+
+      patchKeywordTargetState(activeCategory.id, activeKeywordTarget.id, (target) => ({
+        ...target,
+        lastRunAt: new Date().toISOString(),
+        lastRunStatus: "success"
+      }));
+
+      setSelectedReportId(payload.report.id);
+      setSelectedSupportTopicId(null);
+      setArchivedReports(null);
+
+      const shouldReloadAll = activePlatformId === "all";
+      const shouldReloadCurrent =
+        activePlatformId !== "all" &&
+        isCollectablePlatform(activePlatformId) &&
+        platformIds.includes(activePlatformId);
+
+      if (shouldReloadAll) {
+        await loadStoredContent(activeCategory, activeKeywordTarget, "all", { quiet: true });
+      } else if (shouldReloadCurrent) {
+        await loadStoredContent(activeCategory, activeKeywordTarget, activePlatformId, { quiet: true });
+      }
+
+      void loadHistoryQueries(activeCategory.id);
+      setAnalysisStatusMessage(`已完成 ${activeKeywordTarget.keyword} 的即时分析。`);
+      setStatusMessage(`已完成 ${activeKeywordTarget.keyword} 的即时分析。`);
+    } catch (error) {
+      setAnalysisStatusMessage(error instanceof Error ? error.message : "立即分析失败");
+    } finally {
+      setAnalysisRunning(false);
     }
   }
 
@@ -934,6 +1313,7 @@ export function MonitoringWorkbench() {
     setAnalysisMode("daily");
     setMenuState(null);
     setArchivedReports(null);
+    setSelectedSupportTopicId(null);
     setSelectedHistoryQueryId(null);
     setHistoryDetail(null);
     setHistoryPlatformFilter("all");
@@ -1056,34 +1436,35 @@ export function MonitoringWorkbench() {
     }
 
     const existingTarget = findKeywordTargetByKeyword(activeCategory, normalizedKeyword);
-    const collectablePlatforms =
-      activePlatformId === "all"
-        ? getEnabledCollectablePlatforms(activeCategory)
-        : ([activePlatformId] as ReplicaTrackedPlatformId[]);
-    const fallbackPlatforms =
-      collectablePlatforms.length > 0
-        ? collectablePlatforms
-        : activeKeywordTarget?.platformIds.filter(
-            (platformId) =>
-              isCollectablePlatform(platformId) &&
-              activeCategory.platforms.some(
-                (platform) => platform.id === platformId && platform.enabled
-              )
-          ) ?? ["wechat"];
+    const enabledCollectablePlatforms = getEnabledCollectablePlatforms(activeCategory);
+    const requestedSinglePlatform =
+      activePlatformId !== "all" && isCollectablePlatform(activePlatformId) ? activePlatformId : null;
+    const requestedPlatforms =
+      requestedSinglePlatform
+        ? [requestedSinglePlatform]
+        : enabledCollectablePlatforms.length > 0
+          ? enabledCollectablePlatforms
+          : activeKeywordTarget?.platformIds.filter(isCollectablePlatform) ?? ["wechat"];
 
-    const nextCategory = existingTarget
+    let nextCategory = existingTarget
       ? activeCategory
       : addKeywordTargetToCategory(activeCategory, {
           keyword: normalizedKeyword,
-          platformIds: fallbackPlatforms
+          platformIds: requestedPlatforms
         });
-    const nextKeywordTarget =
+    let nextKeywordTarget =
       findKeywordTargetByKeyword(nextCategory, normalizedKeyword) ??
       existingTarget ??
       activeKeywordTarget;
 
     if (!nextKeywordTarget) {
       return;
+    }
+
+    if (requestedSinglePlatform) {
+      nextCategory = ensureKeywordTargetPlatform(nextCategory, nextKeywordTarget.id, requestedSinglePlatform);
+      nextKeywordTarget =
+        nextCategory.keywordTargets.find((target) => target.id === nextKeywordTarget.id) ?? nextKeywordTarget;
     }
 
     if (nextCategory !== activeCategory) {
@@ -1160,7 +1541,7 @@ export function MonitoringWorkbench() {
             category={activeCategory}
             activeTab={activeTab}
             currentCount={activeTab === "history" ? filteredHistoryQueries.length : displayedCount}
-            currentUpdatedAt={currentArticles[0]?.publishedAt || activeKeywordTarget?.lastRunAt || "今天"}
+            currentUpdatedAt={formatLocalDateTime(currentUpdatedAt)}
             onSelectTab={setActiveTab}
           />
 
@@ -1257,16 +1638,24 @@ export function MonitoringWorkbench() {
                 selectedReportId={selectedReportId}
                 analysisMode={analysisMode}
                 reportWindow={reportWindow}
+                isRunning={analysisRunning}
+                statusMessage={analysisStatusMessage}
+                detail={activeAnalysisDetail}
+                selectedSupportTopicId={selectedSupportTopicId}
                 onSelectReport={setSelectedReportId}
                 onSelectMode={setAnalysisMode}
                 onSelectWindow={setReportWindow}
-                onViewSupportContent={() => setActiveTab("content")}
+                onRunAnalysis={() => void handleRunAnalysis()}
+                onViewSupportContent={setSelectedSupportTopicId}
               />
             ) : null}
 
             {activeTab === "settings" ? (
               <ReplicaSettingsPanel
                 category={activeCategory}
+                globalAnalysisSettings={globalAnalysisSettings}
+                isSavingAnalysisSettings={isSavingAnalysisSettings}
+                analysisSettingsMessage={analysisSettingsMessage}
                 onTogglePlatform={(platformId) =>
                   setCategories((current) =>
                     updateCategory(current, activeCategory.id, (item) => ({
@@ -1336,6 +1725,7 @@ export function MonitoringWorkbench() {
                     )
                   )
                 }
+                onSaveGlobalAnalysisSettings={(settings) => void saveGlobalAnalysisSettings(settings)}
                 onDeleteCategory={handleDeleteCurrentCategory}
               />
             ) : null}

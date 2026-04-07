@@ -59,6 +59,29 @@ export interface PersistedAnalysisSnapshotDetail {
   topics: PersistedAnalysisTopic[];
 }
 
+export interface PersistedAnalysisEvidenceItem {
+  id: string;
+  snapshotId: string;
+  contentId: string;
+  keyword: string;
+  platformId: ContentItem["platformId"];
+  title: string;
+  briefSummary: string;
+  keyFacts: string[];
+  keywords: string[];
+  highlights: string[];
+  attentionSignals: string[];
+  topicAngles: string[];
+  createdAt: string;
+}
+
+export interface PersistedGlobalAnalysisSettings {
+  enabled: boolean;
+  time: string;
+  provider: string;
+  model: string;
+}
+
 export interface PersistedSyncRun {
   id: string;
   categoryId: string;
@@ -250,6 +273,86 @@ export function getKeywordTargetById(
     lastRunStatus: row.last_run_status,
     lastResultCount: row.last_result_count
   };
+}
+
+export function listKeywordTargetsByCategory(
+  repository: MonitoringRepository,
+  categoryId: string
+): PersistedKeywordTarget[] {
+  const rows = repository.database
+    .prepare(
+      `SELECT
+        id,
+        category_id,
+        keyword,
+        platform_ids,
+        created_at,
+        last_run_at,
+        last_run_status,
+        last_result_count
+      FROM keyword_targets
+      WHERE category_id = ?
+      ORDER BY created_at ASC, id ASC`
+    )
+    .all(categoryId) as Array<{
+    id: string;
+    category_id: string;
+    keyword: string;
+    platform_ids: string;
+    created_at: string;
+    last_run_at: string | null;
+    last_run_status: string;
+    last_result_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    categoryId: row.category_id,
+    keyword: row.keyword,
+    platformIds: JSON.parse(row.platform_ids) as ReplicaTrackedPlatformId[],
+    createdAt: row.created_at,
+    lastRunAt: row.last_run_at,
+    lastRunStatus: coerceSyncRunStatus(row.last_run_status),
+    lastResultCount: row.last_result_count
+  }));
+}
+
+export function listAllKeywordTargets(repository: MonitoringRepository): PersistedKeywordTarget[] {
+  const rows = repository.database
+    .prepare(
+      `SELECT
+        id,
+        category_id,
+        keyword,
+        platform_ids,
+        created_at,
+        last_run_at,
+        last_run_status,
+        last_result_count
+      FROM keyword_targets
+      ORDER BY category_id ASC, created_at ASC, id ASC`
+    )
+    .all() as Array<{
+    id: string;
+    category_id: string;
+    keyword: string;
+    platform_ids: string;
+    created_at: string;
+    last_run_at: string | null;
+    last_run_status: string;
+    last_result_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    categoryId: row.category_id,
+    keyword: row.keyword,
+    platformIds: JSON.parse(row.platform_ids) as ReplicaTrackedPlatformId[],
+    createdAt: row.created_at,
+    lastRunAt: row.last_run_at,
+    lastRunStatus: coerceSyncRunStatus(row.last_run_status),
+    lastResultCount: row.last_result_count
+  }));
 }
 
 export function createSearchQuery(repository: MonitoringRepository, input: PersistedSearchQuery) {
@@ -673,6 +776,359 @@ export function getAnalysisSnapshotBySearchQuery(
       supportContentIds: JSON.parse(topic.support_content_ids) as string[]
     }))
   };
+}
+
+export function getAnalysisSnapshotById(
+  repository: MonitoringRepository,
+  snapshotId: string
+): PersistedAnalysisSnapshotDetail | undefined {
+  const snapshot = repository.database
+    .prepare(
+      `SELECT
+        id,
+        search_query_id,
+        category_id,
+        keyword,
+        generated_at,
+        hot_summary,
+        focus_summary,
+        pattern_summary,
+        insight_summary
+      FROM analysis_snapshots
+      WHERE id = ?
+      LIMIT 1`
+    )
+    .get(snapshotId) as
+    | {
+        id: string;
+        search_query_id: string;
+        category_id: string;
+        keyword: string;
+        generated_at: string;
+        hot_summary: string;
+        focus_summary: string;
+        pattern_summary: string;
+        insight_summary: string;
+      }
+    | undefined;
+
+  if (!snapshot) {
+    return undefined;
+  }
+
+  const topics = repository.database
+    .prepare(
+      `SELECT
+        id,
+        title,
+        intro,
+        why_now,
+        hook,
+        growth,
+        support_content_ids
+      FROM analysis_topics
+      WHERE snapshot_id = ?
+      ORDER BY id ASC`
+    )
+    .all(snapshot.id) as Array<{
+    id: string;
+    title: string;
+    intro: string;
+    why_now: string;
+    hook: string;
+    growth: string;
+    support_content_ids: string;
+  }>;
+
+  return {
+    snapshot: {
+      id: snapshot.id,
+      searchQueryId: snapshot.search_query_id,
+      categoryId: snapshot.category_id,
+      keyword: snapshot.keyword,
+      generatedAt: snapshot.generated_at,
+      hotSummary: snapshot.hot_summary,
+      focusSummary: snapshot.focus_summary,
+      patternSummary: snapshot.pattern_summary,
+      insightSummary: snapshot.insight_summary
+    },
+    topics: topics.map((topic) => ({
+      id: topic.id,
+      snapshotId: snapshot.id,
+      title: topic.title,
+      intro: topic.intro,
+      whyNow: topic.why_now,
+      hook: topic.hook,
+      growth: topic.growth,
+      supportContentIds: JSON.parse(topic.support_content_ids) as string[]
+    }))
+  };
+}
+
+export function listAnalysisSnapshotsByKeyword(
+  repository: MonitoringRepository,
+  categoryId: string,
+  keyword: string,
+  limit = 14
+): PersistedAnalysisSnapshotDetail[] {
+  const snapshots = repository.database
+    .prepare(
+      `SELECT
+        id,
+        search_query_id,
+        category_id,
+        keyword,
+        generated_at,
+        hot_summary,
+        focus_summary,
+        pattern_summary,
+        insight_summary
+      FROM analysis_snapshots
+      WHERE category_id = ? AND keyword = ?
+      ORDER BY generated_at DESC, id DESC
+      LIMIT ?`
+    )
+    .all(categoryId, keyword, limit) as Array<{
+    id: string;
+    search_query_id: string;
+    category_id: string;
+    keyword: string;
+    generated_at: string;
+    hot_summary: string;
+    focus_summary: string;
+    pattern_summary: string;
+    insight_summary: string;
+  }>;
+
+  const topicStatement = repository.database.prepare(
+    `SELECT
+      id,
+      title,
+      intro,
+      why_now,
+      hook,
+      growth,
+      support_content_ids
+    FROM analysis_topics
+    WHERE snapshot_id = ?
+    ORDER BY id ASC`
+  );
+
+  return snapshots.map((snapshot) => {
+    const topics = topicStatement.all(snapshot.id) as Array<{
+      id: string;
+      title: string;
+      intro: string;
+      why_now: string;
+      hook: string;
+      growth: string;
+      support_content_ids: string;
+    }>;
+
+    return {
+      snapshot: {
+        id: snapshot.id,
+        searchQueryId: snapshot.search_query_id,
+        categoryId: snapshot.category_id,
+        keyword: snapshot.keyword,
+        generatedAt: snapshot.generated_at,
+        hotSummary: snapshot.hot_summary,
+        focusSummary: snapshot.focus_summary,
+        patternSummary: snapshot.pattern_summary,
+        insightSummary: snapshot.insight_summary
+      },
+      topics: topics.map((topic) => ({
+        id: topic.id,
+        snapshotId: snapshot.id,
+        title: topic.title,
+        intro: topic.intro,
+        whyNow: topic.why_now,
+        hook: topic.hook,
+        growth: topic.growth,
+        supportContentIds: JSON.parse(topic.support_content_ids) as string[]
+      }))
+    };
+  });
+}
+
+export function saveGlobalAnalysisSettings(
+  repository: MonitoringRepository,
+  input: PersistedGlobalAnalysisSettings
+) {
+  repository.database
+    .prepare(
+      `INSERT INTO analysis_settings (
+        singleton_key,
+        enabled,
+        time,
+        provider,
+        model,
+        updated_at
+      ) VALUES ('global', ?, ?, ?, ?, ?)
+      ON CONFLICT(singleton_key) DO UPDATE SET
+        enabled = excluded.enabled,
+        time = excluded.time,
+        provider = excluded.provider,
+        model = excluded.model,
+        updated_at = excluded.updated_at`
+    )
+    .run(
+      input.enabled ? 1 : 0,
+      input.time,
+      input.provider,
+      input.model,
+      new Date().toISOString()
+    );
+}
+
+export function getGlobalAnalysisSettings(
+  repository: MonitoringRepository
+): PersistedGlobalAnalysisSettings {
+  const row = repository.database
+    .prepare(
+      `SELECT enabled, time, provider, model
+      FROM analysis_settings
+      WHERE singleton_key = 'global'`
+    )
+    .get() as
+    | {
+        enabled: number;
+        time: string;
+        provider: string;
+        model: string;
+      }
+    | undefined;
+
+  return {
+    enabled: row ? row.enabled === 1 : true,
+    time: row?.time ?? "08:00",
+    provider: row?.provider ?? "SiliconFlow",
+    model: row?.model ?? "zai-org/GLM-5"
+  };
+}
+
+export function upsertAnalysisEvidenceItems(
+  repository: MonitoringRepository,
+  input: { snapshotId: string; items: PersistedAnalysisEvidenceItem[] }
+) {
+  repository.database.exec("BEGIN");
+
+  try {
+    repository.database
+      .prepare(`DELETE FROM analysis_evidence_items WHERE snapshot_id = ?`)
+      .run(input.snapshotId);
+
+    const statement = repository.database.prepare(
+      `INSERT INTO analysis_evidence_items (
+        id,
+        snapshot_id,
+        content_id,
+        keyword,
+        platform_id,
+        title,
+        brief_summary,
+        key_facts_json,
+        keywords_json,
+        highlights_json,
+        attention_signals_json,
+        topic_angles_json,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        snapshot_id = excluded.snapshot_id,
+        content_id = excluded.content_id,
+        keyword = excluded.keyword,
+        platform_id = excluded.platform_id,
+        title = excluded.title,
+        brief_summary = excluded.brief_summary,
+        key_facts_json = excluded.key_facts_json,
+        keywords_json = excluded.keywords_json,
+        highlights_json = excluded.highlights_json,
+        attention_signals_json = excluded.attention_signals_json,
+        topic_angles_json = excluded.topic_angles_json,
+        created_at = excluded.created_at`
+    );
+
+    for (const item of input.items) {
+      statement.run(
+        item.id,
+        input.snapshotId,
+        item.contentId,
+        item.keyword,
+        item.platformId,
+        item.title,
+        item.briefSummary,
+        JSON.stringify(item.keyFacts),
+        JSON.stringify(item.keywords),
+        JSON.stringify(item.highlights),
+        JSON.stringify(item.attentionSignals),
+        JSON.stringify(item.topicAngles),
+        item.createdAt
+      );
+    }
+
+    repository.database.exec("COMMIT");
+  } catch (error) {
+    repository.database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+export function getAnalysisEvidenceItemsBySnapshotId(
+  repository: MonitoringRepository,
+  snapshotId: string
+): PersistedAnalysisEvidenceItem[] {
+  const rows = repository.database
+    .prepare(
+      `SELECT
+        id,
+        snapshot_id,
+        content_id,
+        keyword,
+        platform_id,
+        title,
+        brief_summary,
+        key_facts_json,
+        keywords_json,
+        highlights_json,
+        attention_signals_json,
+        topic_angles_json,
+        created_at
+      FROM analysis_evidence_items
+      WHERE snapshot_id = ?
+      ORDER BY id ASC`
+    )
+    .all(snapshotId) as Array<{
+    id: string;
+    snapshot_id: string;
+    content_id: string;
+    keyword: string;
+    platform_id: ContentItem["platformId"];
+    title: string;
+    brief_summary: string;
+    key_facts_json: string;
+    keywords_json: string;
+    highlights_json: string;
+    attention_signals_json: string;
+    topic_angles_json: string;
+    created_at: string;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    snapshotId: row.snapshot_id,
+    contentId: row.content_id,
+    keyword: row.keyword,
+    platformId: row.platform_id,
+    title: row.title,
+    briefSummary: row.brief_summary,
+    keyFacts: JSON.parse(row.key_facts_json) as string[],
+    keywords: JSON.parse(row.keywords_json) as string[],
+    highlights: JSON.parse(row.highlights_json) as string[],
+    attentionSignals: JSON.parse(row.attention_signals_json) as string[],
+    topicAngles: JSON.parse(row.topic_angles_json) as string[],
+    createdAt: row.created_at
+  }));
 }
 
 export function upsertCollectedContents(

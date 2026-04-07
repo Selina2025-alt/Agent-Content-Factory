@@ -3,12 +3,14 @@ import type {
   PersistedAnalysisTopic
 } from "@/lib/db/monitoring-repository";
 import type { ReplicaDailyReport } from "@/lib/replica-workbench-data";
+import { formatLocalDateTime } from "@/lib/time-utils";
 
 export interface BuildAnalysisArchiveSnapshotInput {
   searchQueryId: string;
   categoryId: string;
   keyword: string;
   reports: ReplicaDailyReport[];
+  generatedAt?: string;
 }
 
 function getLatestReport(reports: ReplicaDailyReport[]) {
@@ -44,7 +46,7 @@ export function buildAnalysisArchiveSnapshot(
     searchQueryId: input.searchQueryId,
     categoryId: input.categoryId,
     keyword: input.keyword,
-    generatedAt: new Date().toISOString(),
+    generatedAt: input.generatedAt ?? formatLocalDateTime(new Date()),
     hotSummary: activeReport?.hotSummary ?? "",
     focusSummary: activeReport?.focusSummary ?? "",
     patternSummary: activeReport?.patternSummary ?? "",

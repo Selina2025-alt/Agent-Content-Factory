@@ -10,6 +10,7 @@ import {
   createSearchQuery,
   finishSearchQuery,
   getAnalysisSnapshotBySearchQuery,
+  listAnalysisSnapshotsByKeyword,
   listSearchQueryContents,
   listSearchQueries,
   replaceSearchQueryContents,
@@ -200,6 +201,65 @@ describe("monitoring history schema", () => {
         }
       ]
     });
+
+    database.close();
+  });
+
+  it("lists the latest analysis snapshots for a category keyword without mixing other keywords", () => {
+    const database = initializeMonitoringDatabase(":memory:");
+    const repository = createMonitoringRepository(database);
+
+    upsertAnalysisSnapshot(repository, {
+      snapshot: {
+        id: "snapshot-claude-new",
+        searchQueryId: "query-claude-new",
+        categoryId: "claude",
+        keyword: "claude code",
+        generatedAt: "2026-04-03T09:45:00.000Z",
+        hotSummary: "claude-hot-new",
+        focusSummary: "claude-focus-new",
+        patternSummary: "claude-pattern-new",
+        insightSummary: "claude-insight-new"
+      },
+      topics: []
+    });
+
+    upsertAnalysisSnapshot(repository, {
+      snapshot: {
+        id: "snapshot-claude-old",
+        searchQueryId: "query-claude-old",
+        categoryId: "claude",
+        keyword: "claude code",
+        generatedAt: "2026-04-02T09:45:00.000Z",
+        hotSummary: "claude-hot-old",
+        focusSummary: "claude-focus-old",
+        patternSummary: "claude-pattern-old",
+        insightSummary: "claude-insight-old"
+      },
+      topics: []
+    });
+
+    upsertAnalysisSnapshot(repository, {
+      snapshot: {
+        id: "snapshot-other-keyword",
+        searchQueryId: "query-other-keyword",
+        categoryId: "claude",
+        keyword: "openclaw",
+        generatedAt: "2026-04-03T10:45:00.000Z",
+        hotSummary: "other-hot",
+        focusSummary: "other-focus",
+        patternSummary: "other-pattern",
+        insightSummary: "other-insight"
+      },
+      topics: []
+    });
+
+    const reports = listAnalysisSnapshotsByKeyword(repository, "claude", "claude code", 14);
+
+    expect(reports.map((detail) => detail.snapshot.id)).toEqual([
+      "snapshot-claude-new",
+      "snapshot-claude-old"
+    ]);
 
     database.close();
   });

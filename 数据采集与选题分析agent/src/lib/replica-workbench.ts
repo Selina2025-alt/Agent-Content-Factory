@@ -9,6 +9,7 @@ import {
   type ReplicaPlatformId,
   type ReplicaTrackedPlatformId
 } from "@/lib/replica-workbench-data";
+import { formatLocalDate, parseDateLike } from "@/lib/time-utils";
 import type { ContentItem } from "@/lib/types";
 
 export function titleCaseKeyword(keyword: string) {
@@ -182,16 +183,35 @@ export function buildReplicaArticles(category: ReplicaCategory, keyword: string)
     .sort((left, right) => right.publishTimestamp - left.publishTimestamp);
 }
 
-export function buildDateOptions(articles: ReplicaArticle[]) {
+function resolveTimelineAnchor(articles: ReplicaArticle[], anchorDateLike?: Date | number | string | null) {
+  const anchorDate = parseDateLike(anchorDateLike) ?? new Date();
+  const latestArticleDate = parseDateLike(
+    [...articles]
+      .sort((left, right) => right.publishTimestamp - left.publishTimestamp)[0]
+      ?.publishedAt
+      ?.slice(0, 10)
+  );
+
+  if (latestArticleDate) {
+    return anchorDate.getTime() > latestArticleDate.getTime() ? anchorDate : latestArticleDate;
+  }
+
+  return anchorDate;
+}
+
+export function buildDateOptions(
+  articles: ReplicaArticle[],
+  anchorDateLike?: Date | number | string | null
+) {
   const uniqueDates = Array.from(new Set(articles.map((item) => item.publishedAt.slice(0, 10))));
-  const anchorDateText = uniqueDates[0] ?? new Date().toISOString().slice(0, 10);
+  const anchorDateText = formatLocalDate(resolveTimelineAnchor(articles, anchorDateLike));
   const anchorDate = new Date(anchorDateText.replace(/-/g, "/"));
   const timelineDates = new Set(uniqueDates);
 
-  for (let offset = 0; timelineDates.size < 7; offset += 1) {
+  for (let offset = 0; offset < 10 || timelineDates.size < 7; offset += 1) {
     const date = new Date(anchorDate);
     date.setDate(anchorDate.getDate() - offset);
-    timelineDates.add(date.toISOString().slice(0, 10));
+    timelineDates.add(formatLocalDate(date));
   }
 
   return Array.from(timelineDates)
@@ -257,8 +277,17 @@ export function mapContentItemsToReplicaArticles(items: ContentItem[], keyword: 
     .sort((left, right) => right.publishTimestamp - left.publishTimestamp);
 }
 
-export function getDefaultDateId(articles: ReplicaArticle[]) {
-  return buildDateOptions(articles)[0]?.id;
+export function getDefaultDateId(
+  articles: ReplicaArticle[],
+  anchorDateLike?: Date | number | string | null
+) {
+  if (articles.length === 0) {
+    return formatLocalDate(resolveTimelineAnchor([], anchorDateLike));
+  }
+
+  return [...articles]
+    .sort((left, right) => right.publishTimestamp - left.publishTimestamp)[0]
+    ?.publishedAt.slice(0, 10);
 }
 
 export function createReplicaCategory(input: string) {

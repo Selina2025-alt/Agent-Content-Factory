@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const repository = {
   database: {
@@ -44,6 +44,8 @@ vi.mock("@/lib/monitoring-sync-service", () => ({
 
 describe("POST /api/content/refresh", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-07T09:27:49.000Z"));
     vi.clearAllMocks();
     repository.database.close.mockReset();
     getKeywordTargetByIdMock.mockReturnValue(undefined);
@@ -56,7 +58,11 @@ describe("POST /api/content/refresh", () => {
     });
   });
 
-  it("archives an analysis snapshot when reports are provided without changing the response shape", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("archives a fresh analysis snapshot when refresh completes without changing the response shape", async () => {
     const { POST } = await import("@/app/api/content/refresh/route");
 
     const request = new NextRequest("http://localhost/api/content/refresh", {
@@ -86,17 +92,20 @@ describe("POST /api/content/refresh", () => {
     const payload = await response.json();
 
     expect(refreshKeywordTargetPlatformMock).toHaveBeenCalledTimes(1);
-    expect(buildAnalysisArchiveSnapshotMock).toHaveBeenCalledWith({
-      searchQueryId: "query-run-1",
-      categoryId: "claude",
-      keyword: "claude code",
-      reports: [
-        expect.objectContaining({
-          id: "report-1",
-          date: "2026-04-01"
-        })
-      ]
-    });
+    expect(buildAnalysisArchiveSnapshotMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchQueryId: "query-run-1",
+        categoryId: "claude",
+        keyword: "claude code",
+        generatedAt: "2026-04-07",
+        reports: [
+          expect.objectContaining({
+            id: "report-claude code-2026-04-07",
+            date: "2026-04-07"
+          })
+        ]
+      })
+    );
     expect(upsertAnalysisSnapshotMock).toHaveBeenCalledWith(
       repository,
       expect.objectContaining({
@@ -108,6 +117,10 @@ describe("POST /api/content/refresh", () => {
     expect(payload).toEqual({
       items: [],
       rawItems: [],
+      report: expect.objectContaining({
+        id: "report-claude code-2026-04-07",
+        date: "2026-04-07"
+      }),
       meta: {
         source: "wechat",
         sortedBy: "publish_time_desc",
@@ -145,6 +158,10 @@ describe("POST /api/content/refresh", () => {
     expect(payload).toEqual({
       items: [],
       rawItems: [],
+      report: expect.objectContaining({
+        id: "report-claude code-2026-04-07",
+        date: "2026-04-07"
+      }),
       meta: {
         source: "twitter",
         sortedBy: "publish_time_desc",

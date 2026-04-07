@@ -13,6 +13,7 @@ const PLATFORM_LABELS: Record<ContentItem["platformId"], string> = {
   xiaohongshu: "小红书",
   weibo: "微博",
   bilibili: "B站",
+  twitter: "Twitter/X",
   wechat: "公众号"
 };
 
