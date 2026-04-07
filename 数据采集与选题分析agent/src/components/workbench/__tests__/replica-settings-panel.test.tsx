@@ -22,7 +22,7 @@ describe("replica settings panel", () => {
               enabled: true,
               time: "08:00",
               provider: "SiliconFlow",
-              model: "zai-org/GLM-5"
+              model: "Pro/zai-org/GLM-5"
             }
           })
         };

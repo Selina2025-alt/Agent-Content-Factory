@@ -1,3 +1,8 @@
+import {
+  DEFAULT_SILICONFLOW_MODEL,
+  normalizeSiliconFlowModel
+} from "@/lib/analysis-models";
+
 interface SiliconFlowClientOptions {
   apiKey: string;
   baseUrl: string;
@@ -77,6 +82,6 @@ export function createDefaultSiliconFlowClient() {
   return createSiliconFlowClient({
     apiKey,
     baseUrl: process.env.SILICONFLOW_BASE_URL ?? "https://api.siliconflow.cn/v1",
-    model: process.env.SILICONFLOW_MODEL ?? "zai-org/GLM-5"
+    model: normalizeSiliconFlowModel(process.env.SILICONFLOW_MODEL ?? DEFAULT_SILICONFLOW_MODEL)
   });
 }
