@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { DEFAULT_SILICONFLOW_MODEL } from "@/lib/analysis-models";
 import type { ReplicaCategory, ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
 import { replicaPlatforms } from "@/lib/replica-workbench-data";
 
@@ -14,7 +15,7 @@ const DEFAULT_GLOBAL_ANALYSIS_SETTINGS: ReplicaGlobalAnalysisSettings = {
   enabled: true,
   time: "08:00",
   provider: "SiliconFlow",
-  model: "zai-org/GLM-5"
+  model: DEFAULT_SILICONFLOW_MODEL
 };
 
 interface ReplicaSettingsPanelProps {

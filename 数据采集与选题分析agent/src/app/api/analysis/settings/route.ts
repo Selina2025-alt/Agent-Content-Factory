@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { DEFAULT_SILICONFLOW_MODEL } from "@/lib/analysis-models";
 import {
   createMonitoringRepository,
   getGlobalAnalysisSettings,
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
       enabled: body.enabled ?? true,
       time: normalizeTime(body.time ?? "08:00"),
       provider: "SiliconFlow",
-      model: "zai-org/GLM-5"
+      model: DEFAULT_SILICONFLOW_MODEL
     };
 
     saveGlobalAnalysisSettings(repository, settings);

@@ -1,5 +1,9 @@
 import type { MonitoringDatabase } from "@/lib/db/database";
 import { initializeMonitoringDatabase } from "@/lib/db/database";
+import {
+  DEFAULT_SILICONFLOW_MODEL,
+  normalizeSiliconFlowModel
+} from "@/lib/analysis-models";
 import type { ReplicaTrackedPlatformId } from "@/lib/replica-workbench-data";
 import type { ContentItem } from "@/lib/types";
 
@@ -955,6 +959,8 @@ export function saveGlobalAnalysisSettings(
   repository: MonitoringRepository,
   input: PersistedGlobalAnalysisSettings
 ) {
+  const normalizedModel = normalizeSiliconFlowModel(input.model);
+
   repository.database
     .prepare(
       `INSERT INTO analysis_settings (
@@ -976,7 +982,7 @@ export function saveGlobalAnalysisSettings(
       input.enabled ? 1 : 0,
       input.time,
       input.provider,
-      input.model,
+      normalizedModel,
       new Date().toISOString()
     );
 }
@@ -1003,7 +1009,7 @@ export function getGlobalAnalysisSettings(
     enabled: row ? row.enabled === 1 : true,
     time: row?.time ?? "08:00",
     provider: row?.provider ?? "SiliconFlow",
-    model: row?.model ?? "zai-org/GLM-5"
+    model: normalizeSiliconFlowModel(row?.model ?? DEFAULT_SILICONFLOW_MODEL)
   };
 }
 

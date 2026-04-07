@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { DEFAULT_SILICONFLOW_MODEL } from "@/lib/analysis-models";
 import {
   ReplicaAnalysisPanel,
   type ReplicaAnalysisDetail
@@ -318,7 +319,7 @@ export function MonitoringWorkbench() {
     enabled: true,
     time: "08:00",
     provider: "SiliconFlow",
-    model: "zai-org/GLM-5"
+    model: DEFAULT_SILICONFLOW_MODEL
   });
   const [isSavingAnalysisSettings, setIsSavingAnalysisSettings] = useState(false);
   const [analysisSettingsMessage, setAnalysisSettingsMessage] = useState("");

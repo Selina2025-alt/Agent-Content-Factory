@@ -27,7 +27,7 @@ describe("analysis settings and evidence persistence", () => {
       enabled: true,
       time: "09:30",
       provider: "SiliconFlow",
-      model: "zai-org/GLM-5"
+      model: "Pro/zai-org/GLM-5"
     });
 
     database.close();

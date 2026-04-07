@@ -32,7 +32,7 @@ describe("analysis settings route", () => {
       enabled: true,
       time: "08:00",
       provider: "SiliconFlow",
-      model: "zai-org/GLM-5"
+      model: "Pro/zai-org/GLM-5"
     });
     syncDailyAnalysisTaskMock.mockReturnValue({
       ok: true,
@@ -51,7 +51,7 @@ describe("analysis settings route", () => {
         enabled: true,
         time: "08:00",
         provider: "SiliconFlow",
-        model: "zai-org/GLM-5"
+        model: "Pro/zai-org/GLM-5"
       }
     });
   });
@@ -75,7 +75,7 @@ describe("analysis settings route", () => {
         enabled: true,
         time: "09:30",
         provider: "SiliconFlow",
-        model: "zai-org/GLM-5"
+        model: "Pro/zai-org/GLM-5"
       })
     );
     expect(syncDailyAnalysisTaskMock).toHaveBeenCalledWith({
@@ -87,7 +87,7 @@ describe("analysis settings route", () => {
         enabled: true,
         time: "09:30",
         provider: "SiliconFlow",
-        model: "zai-org/GLM-5"
+        model: "Pro/zai-org/GLM-5"
       },
       task: {
         ok: true,
