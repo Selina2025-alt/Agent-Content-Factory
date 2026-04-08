@@ -883,6 +883,17 @@ textarea {
   gap: 18px;
 }
 
+.settings-skills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.settings-panel-stack {
+  display: grid;
+  gap: 18px;
+}
+
 .settings-card {
   border-radius: 28px;
   border: 1px solid rgba(117, 71, 35, 0.12);
@@ -961,6 +972,31 @@ textarea {
   gap: 16px;
 }
 
+.settings-library-item--active {
+  border-color: rgba(157, 61, 32, 0.24);
+  box-shadow: 0 14px 30px rgba(85, 41, 16, 0.08);
+}
+
+.settings-library-item__button {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-library-item__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .settings-library-item strong,
 .settings-empty strong {
   display: block;
@@ -974,6 +1010,42 @@ textarea {
   line-height: 1.7;
 }
 
+.settings-upload {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px dashed rgba(157, 61, 32, 0.28);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.settings-upload input {
+  width: 100%;
+}
+
+.settings-upload__meta {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+}
+
+.settings-command {
+  min-height: 132px;
+}
+
+.settings-detail-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-detail-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  line-height: 1.8;
+}
+
 @media (max-width: 1080px) {
   .settings-layout {
     grid-template-columns: 1fr;
@@ -981,7 +1053,8 @@ textarea {
 }
 
 @media (max-width: 760px) {
-  .settings-grid {
+  .settings-grid,
+  .settings-skills-grid {
     grid-template-columns: 1fr;
   }
 }

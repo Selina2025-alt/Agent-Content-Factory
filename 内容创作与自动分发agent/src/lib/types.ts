@@ -104,3 +104,13 @@ export interface SkillRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface SkillLearningResultRecord {
+  skillId: string;
+  summary: string;
+  rules: string[];
+  platformHints: string[];
+  keywords: string[];
+  examplesSummary: string[];
+  updatedAt: string;
+}

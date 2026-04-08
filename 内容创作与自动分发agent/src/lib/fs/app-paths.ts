@@ -32,3 +32,11 @@ export function getSkillsUploadsPath() {
 export function getSkillsUnpackedPath() {
   return path.join(getSkillsRoot(), "unpacked");
 }
+
+export function getSkillUploadFilePath(fileName: string) {
+  return path.join(getSkillsUploadsPath(), fileName);
+}
+
+export function getSkillUnpackedDirectory(skillId: string) {
+  return path.join(getSkillsUnpackedPath(), skillId);
+}

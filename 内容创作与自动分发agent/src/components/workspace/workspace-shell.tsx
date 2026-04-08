@@ -45,6 +45,7 @@ export function WorkspaceShell(props: {
   const [isPublishing, setIsPublishing] = useState(false);
   const [statusText, setStatusText] = useState("内容已就绪");
   const isFirstRender = useRef(true);
+  const suppressAutosaveStatus = useRef(false);
 
   const activeLabel = platformLabels[activePlatform];
   const currentContent = bundle[activePlatform];
@@ -64,6 +65,11 @@ export function WorkspaceShell(props: {
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      return;
+    }
+
+    if (suppressAutosaveStatus.current) {
+      suppressAutosaveStatus.current = false;
       return;
     }
 
@@ -138,6 +144,7 @@ export function WorkspaceShell(props: {
 
       const result = (await response.json()) as { message: string; status: string };
 
+      suppressAutosaveStatus.current = true;
       setBundle((currentBundle) => {
         const platformContent = currentBundle[activePlatform];
 

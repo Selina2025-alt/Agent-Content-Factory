@@ -3,9 +3,14 @@ type SkillListItem = {
   name: string;
   summary: string;
   source: string;
+  status: string;
 };
 
-export function SkillsLibrary(props: { skills: SkillListItem[] }) {
+export function SkillsLibrary(props: {
+  activeSkillId?: string | null;
+  onSelect?: (skillId: string) => void;
+  skills: SkillListItem[];
+}) {
   return (
     <section className="settings-card">
       <p className="settings-card__eyebrow">Skills Library</p>
@@ -17,19 +22,38 @@ export function SkillsLibrary(props: { skills: SkillListItem[] }) {
       {props.skills.length > 0 ? (
         <div className="settings-library-list">
           {props.skills.map((skill) => (
-            <article className="settings-library-item" key={skill.id}>
-              <div>
-                <strong>{skill.name}</strong>
-                <p>{skill.summary}</p>
-              </div>
-              <span className="settings-chip">{skill.source}</span>
+            <article
+              className={[
+                "settings-library-item",
+                props.activeSkillId === skill.id
+                  ? "settings-library-item--active"
+                  : ""
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              key={skill.id}
+            >
+              <button
+                className="settings-library-item__button"
+                onClick={() => props.onSelect?.(skill.id)}
+                type="button"
+              >
+                <div>
+                  <strong>{skill.name}</strong>
+                  <p>{skill.summary}</p>
+                </div>
+                <div className="settings-library-item__meta">
+                  <span className="settings-chip">{skill.source}</span>
+                  <span className="settings-chip">{skill.status}</span>
+                </div>
+              </button>
             </article>
           ))}
         </div>
       ) : (
         <div className="settings-empty">
           <strong>还没有导入任何 skills</strong>
-          <p>下一步我们会在这里接上 zip 上传、解析学习和 GitHub 安装能力。</p>
+          <p>上传一个 zip 技能包后，这里会显示解析结果，并允许你切换查看详情。</p>
         </div>
       )}
     </section>

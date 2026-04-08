@@ -1,16 +1,26 @@
+"use client";
+
+import { useState } from "react";
+
 import { PlatformRuleBindingPanel } from "@/components/settings/platform-rule-binding-panel";
+import { GithubSkillInstallPanel } from "@/components/settings/github-skill-install-panel";
+import { SkillDetailPanel } from "@/components/settings/skill-detail-panel";
+import { SkillUploadPanel } from "@/components/settings/skill-upload-panel";
 import { SkillsLibrary } from "@/components/settings/skills-library";
+import type { SkillLearningResultRecord, SkillRecord } from "@/lib/types";
 
 const platformPanels = [
   {
     key: "wechat",
     label: "公众号文章",
-    description: "适合长文深度内容，支持标题、摘要、正文和基础富文本结构。"
+    description:
+      "适合长文深度内容，支持标题、摘要、正文和基础富文本结构。"
   },
   {
     key: "xiaohongshu",
     label: "小红书笔记",
-    description: "面向图文种草场景，突出标题、文案和图片建议。"
+    description:
+      "面向图文种草场景，突出标题、文案和图片建议。"
   },
   {
     key: "twitter",
@@ -24,7 +34,41 @@ const platformPanels = [
   }
 ] as const;
 
-export function SettingsShell() {
+type SkillDetailsMap = Record<string, SkillLearningResultRecord | null>;
+
+export function SettingsShell(props: {
+  initialSkillDetails?: SkillDetailsMap;
+  initialSkills?: SkillRecord[];
+}) {
+  const [skills, setSkills] = useState(props.initialSkills ?? []);
+  const [skillDetails, setSkillDetails] = useState<SkillDetailsMap>(
+    props.initialSkillDetails ?? {}
+  );
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(
+    props.initialSkills?.[0]?.id ?? null
+  );
+
+  const selectedSkill =
+    skills.find((skill) => skill.id === selectedSkillId) ?? null;
+  const selectedLearningResult = selectedSkillId
+    ? skillDetails[selectedSkillId] ?? null
+    : null;
+
+  function handleSkillReady(input: {
+    skill: SkillRecord;
+    learningResult: SkillLearningResultRecord;
+  }) {
+    setSkills((current) => [
+      input.skill,
+      ...current.filter((skill) => skill.id !== input.skill.id)
+    ]);
+    setSkillDetails((current) => ({
+      ...current,
+      [input.skill.id]: input.learningResult
+    }));
+    setSelectedSkillId(input.skill.id);
+  }
+
   return (
     <main className="settings-layout">
       <aside className="settings-nav">
@@ -47,14 +91,35 @@ export function SettingsShell() {
           {platformPanels.map((panel) => (
             <PlatformRuleBindingPanel
               description={panel.description}
-              enabledSkillNames={[]}
+              enabledSkillNames={skills.slice(0, 2).map((skill) => skill.name)}
               key={panel.key}
               platform={panel.label}
             />
           ))}
         </div>
 
-        <SkillsLibrary skills={[]} />
+        <div className="settings-skills-grid">
+          <div className="settings-panel-stack">
+            <SkillUploadPanel onUploaded={handleSkillReady} />
+            <GithubSkillInstallPanel onInstalled={handleSkillReady} />
+          </div>
+          <SkillDetailPanel
+            learningResult={selectedLearningResult}
+            skill={selectedSkill}
+          />
+        </div>
+
+        <SkillsLibrary
+          activeSkillId={selectedSkillId}
+          onSelect={setSelectedSkillId}
+          skills={skills.map((skill) => ({
+            id: skill.id,
+            name: skill.name,
+            summary: skill.summary,
+            source: skill.sourceType.toUpperCase(),
+            status: skill.status
+          }))}
+        />
       </section>
     </main>
   );
