@@ -1,15 +1,17 @@
-const platforms = ["公众号文章", "小红书笔记", "Twitter", "视频脚本"] as const;
+import { CreateTaskHero } from "@/components/home/create-task-hero";
 
 export default function HomePage() {
   return (
-    <main>
-      <h1>What should we create today?</h1>
-      {platforms.map((platform) => (
-        <label key={platform}>
-          <input aria-label={platform} type="checkbox" />
-          {platform}
-        </label>
-      ))}
+    <main className="home-page">
+      <div className="home-page__backdrop" />
+      <section className="home-page__intro">
+        <p className="eyebrow">Content Factory</p>
+        <h1>What should we create today?</h1>
+        <p className="home-page__description">
+          用一个需求，同时生成适配公众号、小红书、Twitter 和视频脚本的多平台内容。
+        </p>
+      </section>
+      <CreateTaskHero />
     </main>
   );
 }
