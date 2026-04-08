@@ -2,3 +2,4 @@ node_modules/
 .next/
 coverage/
 .codex-data/
+.codex-data-tests/
