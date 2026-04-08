@@ -51,6 +51,29 @@ export interface GeneratedTaskContentBundle {
   videoScript: VideoScriptContentBody | null;
 }
 
+export type PersistedWechatContent = WechatContentBody & {
+  publishStatus: PublishStatus;
+};
+
+export type PersistedXiaohongshuContent = XiaohongshuContentBody & {
+  publishStatus: PublishStatus;
+};
+
+export type PersistedTwitterContent = TwitterContentBody & {
+  publishStatus: PublishStatus;
+};
+
+export type PersistedVideoScriptContent = VideoScriptContentBody & {
+  publishStatus: PublishStatus;
+};
+
+export interface PersistedGeneratedTaskContentBundle {
+  wechat: PersistedWechatContent | null;
+  xiaohongshu: PersistedXiaohongshuContent | null;
+  twitter: PersistedTwitterContent | null;
+  videoScript: PersistedVideoScriptContent | null;
+}
+
 export interface PlatformContentRecord {
   id: string;
   taskId: string;

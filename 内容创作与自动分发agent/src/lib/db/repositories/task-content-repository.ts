@@ -2,6 +2,7 @@ import type {
   GeneratedTaskContentBundle,
   PlatformContentRecord,
   PlatformId,
+  PersistedGeneratedTaskContentBundle,
   PublishStatus
 } from "@/lib/types";
 import { openDatabase } from "@/lib/db/client";
@@ -151,26 +152,40 @@ export function listTaskContents(taskId: string) {
 
 export function getTaskBundle(taskId: string) {
   const rows = listTaskContents(taskId);
+  const bundle: PersistedGeneratedTaskContentBundle = {
+    wechat: null,
+    xiaohongshu: null,
+    twitter: null,
+    videoScript: null
+  };
 
-  return rows.reduce(
-    (bundle, row) => {
-      const parsedBody = JSON.parse(row.bodyJson) as Record<string, unknown>;
-      const content = {
-        ...parsedBody,
-        publishStatus: row.publishStatus
-      };
+  for (const row of rows) {
+    const content = {
+      ...(JSON.parse(row.bodyJson) as Record<string, unknown>),
+      publishStatus: row.publishStatus
+    };
 
-      bundle[row.platform] = content;
+    switch (row.platform) {
+      case "wechat":
+        bundle.wechat = content as PersistedGeneratedTaskContentBundle["wechat"];
+        break;
+      case "xiaohongshu":
+        bundle.xiaohongshu =
+          content as PersistedGeneratedTaskContentBundle["xiaohongshu"];
+        break;
+      case "twitter":
+        bundle.twitter = content as PersistedGeneratedTaskContentBundle["twitter"];
+        break;
+      case "videoScript":
+        bundle.videoScript =
+          content as PersistedGeneratedTaskContentBundle["videoScript"];
+        break;
+      default:
+        break;
+    }
+  }
 
-      return bundle;
-    },
-    {
-      wechat: null,
-      xiaohongshu: null,
-      twitter: null,
-      videoScript: null
-    } as Record<PlatformId, Record<string, unknown> | null>
-  );
+  return bundle;
 }
 
 export function updatePublishStatus(

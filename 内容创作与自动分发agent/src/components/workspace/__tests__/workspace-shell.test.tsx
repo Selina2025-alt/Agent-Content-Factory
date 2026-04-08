@@ -62,9 +62,9 @@ describe("WorkspaceShell", () => {
       "aria-selected",
       "true"
     );
-    expect(screen.getByText("当前正在查看 Twitter 内容")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Thread" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "视频脚本" }));
-    expect(screen.getByText("当前正在查看 视频脚本 内容")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "小红书笔记" }));
+    expect(screen.getByText("图片建议")).toBeInTheDocument();
   });
 });
