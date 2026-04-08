@@ -28,27 +28,27 @@ export interface XiaohongshuContentBody {
   hashtags: string[];
 }
 
-export interface TwitterPost {
-  id: string;
-  text: string;
-}
-
 export interface TwitterContentBody {
   mode: TwitterMode;
-  posts: TwitterPost[];
+  tweets: string[];
 }
 
 export interface VideoScene {
-  id: string;
   shot: string;
+  visual: string;
   voiceover: string;
 }
 
 export interface VideoScriptContentBody {
   title: string;
-  intro: string;
   scenes: VideoScene[];
-  outro: string;
+}
+
+export interface GeneratedTaskContentBundle {
+  wechat: WechatContentBody | null;
+  xiaohongshu: XiaohongshuContentBody | null;
+  twitter: TwitterContentBody | null;
+  videoScript: VideoScriptContentBody | null;
 }
 
 export interface PlatformContentRecord {
