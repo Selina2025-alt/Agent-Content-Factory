@@ -1,0 +1,3 @@
+{"type":"server-started","port":49572,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:49572","screen_dir":"C:\\Users\\koubinyue\\codex project\\Agent内容工厂\\内容创作与自动分发agent\\.superpowers\\brainstorm\\wireframe-1775559816\\content","state_dir":"C:\\Users\\koubinyue\\codex project\\Agent内容工厂\\内容创作与自动分发agent\\.superpowers\\brainstorm\\wireframe-1775559816\\state"}
+{"type":"screen-added","file":"C:\\Users\\koubinyue\\codex project\\Agent内容工厂\\内容创作与自动分发agent\\.superpowers\\brainstorm\\wireframe-1775559816\\content\\01-layout-options.html"}
+{"type":"server-stopped","reason":"idle timeout"}
