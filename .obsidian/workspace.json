@@ -1,24 +1,24 @@
 {
   "main": {
-    "id": "d2501df113432fc2",
+    "id": "f461e9122a152236",
     "type": "split",
     "children": [
       {
-        "id": "a0a506ae93e9386d",
+        "id": "284e61c561ce64d8",
         "type": "tabs",
         "children": [
           {
-            "id": "208fa059de28c03b",
+            "id": "e485bfe3e42e5846",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/superpowers/specs/2026-04-03-siliconflow-topic-analysis-design.md",
+                "file": "内容创作与自动分发agent/docs/ACCEPTANCE_CHECKLIST.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-04-03-siliconflow-topic-analysis-design"
+              "title": "ACCEPTANCE_CHECKLIST"
             }
           }
         ]
@@ -27,15 +27,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "8de1fe54bce2422f",
+    "id": "33ea97d05d5e538d",
     "type": "split",
     "children": [
       {
-        "id": "7d4a283c13500b65",
+        "id": "fe6548a10d86a24f",
         "type": "tabs",
         "children": [
           {
-            "id": "21c9184162421079",
+            "id": "5943692403015f28",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -48,7 +48,7 @@
             }
           },
           {
-            "id": "eb3852f69e31abd5",
+            "id": "dade9a57057c3db5",
             "type": "leaf",
             "state": {
               "type": "search",
@@ -65,7 +65,7 @@
             }
           },
           {
-            "id": "4ba727adf56a19b0",
+            "id": "0928d98f8959b043",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -81,20 +81,20 @@
     "width": 300
   },
   "right": {
-    "id": "684fae9780ef152e",
+    "id": "f57ea8574ba36590",
     "type": "split",
     "children": [
       {
-        "id": "b2c71a3dc1957bd3",
+        "id": "9d1398d7e51f0b95",
         "type": "tabs",
         "children": [
           {
-            "id": "5507234ae4d64948",
+            "id": "ff677dc883c24786",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "docs/superpowers/specs/2026-03-27-content-monitoring-workbench-design.md",
+                "file": "内容创作与自动分发agent/docs/测试.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,25 +104,25 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "2026-03-27-content-monitoring-workbench-design 的反向链接列表"
+              "title": "测试 的反向链接列表"
             }
           },
           {
-            "id": "c6fc7f6a01009fc9",
+            "id": "61167073e50390bd",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "docs/superpowers/specs/2026-03-27-content-monitoring-workbench-design.md",
+                "file": "内容创作与自动分发agent/docs/测试.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "2026-03-27-content-monitoring-workbench-design 的出链列表"
+              "title": "测试 的出链列表"
             }
           },
           {
-            "id": "484aa9d1445ffcb9",
+            "id": "0ab482c49f398a41",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -137,7 +137,7 @@
             }
           },
           {
-            "id": "953a82b8455103a5",
+            "id": "206fc4a5f379228b",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -151,18 +151,18 @@
             }
           },
           {
-            "id": "cac1d3cb49e883fa",
+            "id": "95f2cb65646379f8",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-                "file": "docs/superpowers/specs/2026-03-27-content-monitoring-workbench-design.md",
+                "file": "内容创作与自动分发agent/docs/测试.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "2026-03-27-content-monitoring-workbench-design 的大纲"
+              "title": "测试 的大纲"
             }
           }
         ]
@@ -183,32 +183,21 @@
       "bases:新建数据库": false
     }
   },
-  "active": "208fa059de28c03b",
+  "active": "e485bfe3e42e5846",
   "lastOpenFiles": [
-    "未命名.md",
-    "docs/superpowers/specs/2026-04-03-siliconflow-topic-analysis-design.md",
-    "codex-skills-export-2026-04-07.zip",
-    "codex-skills-export-2026-04-07/restore-codex-skills.ps1",
-    "codex-skills-export-2026-04-07/README.md",
-    "codex-skills-export-2026-04-07",
-    "README.md",
-    "docs/superpowers/plans/2026-04-03-siliconflow-topic-analysis.md",
-    "docs/superpowers/plans/2026-04-02-twitter-monitoring.md",
-    "docs/superpowers/specs/2026-03-27-content-monitoring-workbench-design.md",
-    "docs/superpowers/plans/2026-03-27-content-monitoring-workbench.md",
-    "docs/superpowers/plans/2026-04-01-query-history-and-analysis-archive.md",
-    "项目管理/ContentPulse/Project Dashboard.md",
-    "docs/superpowers/specs/2026-04-02-twitter-monitoring-design.md",
-    "docs/superpowers/specs/2026-04-01-search-history-page-design.md",
-    "docs/superpowers/specs/2026-03-31-xiaohongshu-monitoring-persistence-design.md",
+    "内容创作与自动分发agent/docs/PROJECT_STATUS.md",
+    "内容创作与自动分发agent/docs/ACCEPTANCE_CHECKLIST.md",
+    "数据采集与选题分析agent/OBSIDIAN_SETUP.md",
+    "艾氪智能营销手册（讨论稿）.md",
     "未命名",
-    "docs/superpowers/specs/2026-04-01-query-history-and-analysis-archive-design.md",
-    "未命名.canvas",
-    "prototype/content-monitoring-replica.js",
-    "prototype/content-monitoring-replica.css",
-    "prototype/content-monitoring-replica.html",
-    "prototype",
-    "prod-server.log",
-    "docs/superpowers/plans"
+    "数据采集与选题分析agent/项目管理/ContentPulse/Project Dashboard.md",
+    "数据采集与选题分析agent/项目管理/ContentPulse/Progress Log.md",
+    "数据采集与选题分析agent/项目管理/ContentPulse/Decisions.md",
+    "数据采集与选题分析agent/项目管理/ContentPulse/Backlog.md",
+    "内容创作与自动分发agent/docs/测试.md",
+    "内容创作与自动分发agent/docs/superpowers/plans/2026-04-08-content-creation-agent-implementation.md",
+    "内容创作与自动分发agent/picture.md",
+    "内容创作与自动分发agent/docs/superpowers/specs/2026-04-08-content-creation-agent-design.md",
+    "内容创作与自动分发agent/docs/superpowers/plans"
   ]
 }
