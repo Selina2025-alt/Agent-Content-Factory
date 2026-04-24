@@ -8,6 +8,7 @@ import {
   saveSkillLearningResult
 } from "@/lib/db/repositories/skill-repository";
 import { installSkillFromGithub } from "@/lib/skills/github-skill-install-service";
+import type { SkillKind } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
     path?: string;
     ref?: string;
     repo?: string;
+    skillKind?: unknown;
   };
+  const skillKind: SkillKind = body.skillKind === "image" ? "image" : "content";
 
   if (!body.command && !(body.repo && body.path)) {
     return NextResponse.json(
@@ -45,7 +48,8 @@ export async function POST(request: Request) {
       sourceType: "github",
       sourceRef: result.sourceRef,
       summary: result.learningResult.summary,
-      status: "ready"
+      status: "ready",
+      skillKind
     });
     saveSkillLearningResult(result.id, result.learningResult);
 

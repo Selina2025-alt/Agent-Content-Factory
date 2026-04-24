@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getTaskGenerationTrace } from "@/lib/content/task-generation-trace";
 import { migrateDatabase } from "@/lib/db/migrate";
 import { getTaskBundle } from "@/lib/db/repositories/task-content-repository";
 import {
@@ -25,7 +26,8 @@ export async function GET(
 
   return NextResponse.json({
     task,
-    bundle: getTaskBundle(taskId)
+    bundle: getTaskBundle(taskId),
+    trace: getTaskGenerationTrace(taskId)
   });
 }
 

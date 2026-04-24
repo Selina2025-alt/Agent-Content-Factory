@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 
 type HistoryItem = {
@@ -85,16 +86,16 @@ export function HistorySidebar({
               className={`history-card${isActive ? " history-card--active" : ""}`}
               key={item.id}
             >
-              <button
+              <Link
                 className="history-card__select"
+                href={`/workspace/${item.id}`}
                 onClick={() => onSelect(item.id)}
-                type="button"
               >
                 <span className="history-card__title">{item.title}</span>
                 <span className="history-card__time">
                   {formatUpdatedAt(item.updatedAt)}
                 </span>
-              </button>
+              </Link>
 
               {isEditing ? (
                 <div className="history-card__rename">

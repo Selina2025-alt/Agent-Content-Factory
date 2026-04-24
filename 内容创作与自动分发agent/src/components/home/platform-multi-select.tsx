@@ -12,25 +12,25 @@ const platformOptions: Array<{
     id: "wechat",
     label: "公众号文章",
     tag: "Long-form",
-    description: "适合深度观点、完整结构和可编辑的长文内容。"
+    description: "长文、深度观点、富文本编辑"
   },
   {
     id: "xiaohongshu",
     label: "小红书笔记",
     tag: "Lifestyle",
-    description: "图片建议 + 爆点文案，适合种草和经验分享。"
+    description: "图文种草、9 图建议、短文案"
   },
   {
     id: "twitter",
     label: "Twitter",
     tag: "Thread-ready",
-    description: "自动判断单条或 Thread，并保留后续手动编辑空间。"
+    description: "单条或 Thread，适合短观点输出"
   },
   {
     id: "videoScript",
     label: "视频脚本",
     tag: "Storyboard",
-    description: "分镜 + 旁白结构，适合短视频创作和口播规划。"
+    description: "分镜、旁白、短视频结构"
   }
 ];
 

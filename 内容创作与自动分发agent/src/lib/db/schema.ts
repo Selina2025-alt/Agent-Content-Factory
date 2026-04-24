@@ -1,4 +1,14 @@
 export const schemaStatements = [
+  `CREATE TABLE IF NOT EXISTS drafts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    selected_platforms_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    last_generated_task_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -24,6 +34,7 @@ export const schemaStatements = [
     platform TEXT PRIMARY KEY,
     base_rules_json TEXT NOT NULL,
     enabled_skill_ids_json TEXT NOT NULL,
+    image_skill_ids_json TEXT NOT NULL DEFAULT '[]',
     updated_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS skills (
@@ -33,8 +44,13 @@ export const schemaStatements = [
     source_ref TEXT NOT NULL,
     summary TEXT NOT NULL,
     status TEXT NOT NULL,
+    skill_kind TEXT NOT NULL DEFAULT 'content',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS deleted_builtin_skills (
+    skill_id TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS skill_files (
     id TEXT PRIMARY KEY,
@@ -65,5 +81,12 @@ export const schemaStatements = [
     action_type TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS library_entries (
+    task_id TEXT PRIMARY KEY,
+    source_draft_id TEXT,
+    platform TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
   )`
 ];

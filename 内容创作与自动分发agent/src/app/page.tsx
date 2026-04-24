@@ -6,11 +6,15 @@ export default function HomePage() {
       <div className="home-page__backdrop" />
       <section className="home-page__intro">
         <p className="eyebrow">Content Factory</p>
-        <h1>What should we create today?</h1>
+        <h1>
+          <span>What should we</span>
+          <span>create today?</span>
+        </h1>
         <p className="home-page__description">
-          用一个需求，同时生成适配公众号、小红书、Twitter 和视频脚本的多平台内容。
+          一个需求，同时生成适配公众号、小红书、Twitter 和视频脚本的多平台内容。
         </p>
       </section>
+
       <CreateTaskHero />
     </main>
   );

@@ -41,6 +41,7 @@ export async function PATCH(
   const body = (await request.json()) as {
     baseRules?: string[];
     enabledSkillIds?: string[];
+    imageSkillIds?: string[];
   };
 
   if (!allowedPlatforms.has(platform as PlatformId)) {
@@ -50,7 +51,10 @@ export async function PATCH(
   upsertPlatformSetting({
     platform: platform as PlatformId,
     baseRulesJson: JSON.stringify(body.baseRules ?? []),
-    enabledSkillIdsJson: JSON.stringify(body.enabledSkillIds ?? [])
+    enabledSkillIdsJson: JSON.stringify(body.enabledSkillIds ?? []),
+    imageSkillIdsJson: Array.isArray(body.imageSkillIds)
+      ? JSON.stringify(body.imageSkillIds)
+      : undefined
   });
 
   return NextResponse.json({ ok: true });

@@ -8,6 +8,7 @@ import {
   saveSkillLearningResult
 } from "@/lib/db/repositories/skill-repository";
 import { ingestSkillZip } from "@/lib/skills/zip-skill-ingestion-service";
+import type { SkillKind } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get("file");
+  const skillKind: SkillKind = formData.get("skillKind") === "image" ? "image" : "content";
 
   if (!(file instanceof File)) {
     return NextResponse.json({ message: "Missing zip file" }, { status: 400 });
@@ -33,7 +35,8 @@ export async function POST(request: Request) {
       sourceType: "zip",
       sourceRef: result.sourceRef,
       summary: result.learningResult.summary,
-      status: "ready"
+      status: "ready",
+      skillKind
     });
     saveSkillLearningResult(result.id, result.learningResult);
 

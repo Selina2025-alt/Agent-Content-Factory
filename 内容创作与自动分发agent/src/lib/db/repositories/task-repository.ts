@@ -108,6 +108,7 @@ export function deleteTask(taskId: string) {
   const db = openDatabase();
 
   db.prepare("DELETE FROM history_actions WHERE task_id = ?").run(taskId);
+  db.prepare("DELETE FROM library_entries WHERE task_id = ?").run(taskId);
   db.prepare("DELETE FROM task_contents WHERE task_id = ?").run(taskId);
   db.prepare("DELETE FROM tasks WHERE id = ?").run(taskId);
 

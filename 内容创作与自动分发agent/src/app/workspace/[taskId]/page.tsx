@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { getTaskGenerationTrace } from "@/lib/content/task-generation-trace";
 import { migrateDatabase } from "@/lib/db/migrate";
+import { getLibraryEntry } from "@/lib/db/repositories/library-entry-repository";
 import { getTaskBundle } from "@/lib/db/repositories/task-content-repository";
 import { getTaskById, listTasks } from "@/lib/db/repositories/task-repository";
 
@@ -27,6 +29,8 @@ export default async function WorkspacePage(props: {
         title: item.title,
         updatedAt: item.updatedAt
       }))}
+      initialIsInLibrary={Boolean(getLibraryEntry(taskId))}
+      initialTrace={getTaskGenerationTrace(taskId)}
       initialTask={task}
       initialTaskId={taskId}
     />

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import type { SkillLearningResultRecord, SkillRecord } from "@/lib/types";
+import type { SkillKind, SkillLearningResultRecord, SkillRecord } from "@/lib/types";
 
 type UploadedSkillPayload = {
   skill: SkillRecord;
@@ -13,6 +13,7 @@ export function SkillUploadPanel(props: {
   onUploaded?: (payload: UploadedSkillPayload) => void;
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [skillKind, setSkillKind] = useState<SkillKind>("content");
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -24,6 +25,7 @@ export function SkillUploadPanel(props: {
 
     const formData = new FormData();
     formData.set("file", selectedFile);
+    formData.set("skillKind", skillKind);
 
     const response = await fetch("/api/skills/upload", {
       method: "POST",
@@ -44,6 +46,7 @@ export function SkillUploadPanel(props: {
     });
     setMessage("技能包已上传并完成学习。");
     setSelectedFile(null);
+    setSkillKind("content");
   }
 
   return (
@@ -51,9 +54,27 @@ export function SkillUploadPanel(props: {
       <p className="settings-card__eyebrow">Zip Upload</p>
       <h2 className="settings-card__title">上传 zip 技能包</h2>
       <p className="settings-card__description">
-        技能包根目录必须包含 <code>SKILL.md</code>。系统会先读取、解析并提炼规则，再加入到 Skills
-        资源库。
+        技能包根目录必须包含 <code>SKILL.md</code>。上传前请选择它是内容技能还是图片技能。
       </p>
+
+      <div className="settings-kind-toggle" aria-label="Upload skill type">
+        <button
+          aria-pressed={skillKind === "content"}
+          className={skillKind === "content" ? "is-active" : ""}
+          onClick={() => setSkillKind("content")}
+          type="button"
+        >
+          内容技能
+        </button>
+        <button
+          aria-pressed={skillKind === "image"}
+          className={skillKind === "image" ? "is-active" : ""}
+          onClick={() => setSkillKind("image")}
+          type="button"
+        >
+          图片技能
+        </button>
+      </div>
 
       <label className="settings-upload">
         <span>选择 zip 文件</span>
